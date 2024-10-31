@@ -1,16 +1,14 @@
 use std::fmt;
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
-// use super::{Convert, Float, NumOps};
-
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct SoftFloat16(u16);
 
-const POS_INFINITY: SoftFloat16 = SoftFloat16(0x7c00);
-const NEG_INFINITY: SoftFloat16 = SoftFloat16(0xfc00);
-const NAN: SoftFloat16 = SoftFloat16(0x7e00);
-const POS_ZERO: SoftFloat16 = SoftFloat16(0x0);
-const NEG_ZERO: SoftFloat16 = SoftFloat16(0x8000);
+pub const POS_INFINITY: SoftFloat16 = SoftFloat16(0x7c00);
+pub const NEG_INFINITY: SoftFloat16 = SoftFloat16(0xfc00);
+pub const NAN: SoftFloat16 = SoftFloat16(0x7e00);
+pub const POS_ZERO: SoftFloat16 = SoftFloat16(0x0);
+pub const NEG_ZERO: SoftFloat16 = SoftFloat16(0x8000);
 
 impl SoftFloat16 {
     pub fn from_bits(v: u16) -> Self {
@@ -21,10 +19,6 @@ impl SoftFloat16 {
         } else {
             v
         }
-    }
-
-    pub fn is_denormal(v: Self) -> bool {
-        Self::exponent(v) == 0 && Self::significand(v) != 0
     }
 
     pub fn to_bits(v: Self) -> u16 {
@@ -44,322 +38,11 @@ impl SoftFloat16 {
     }
 }
 
-// impl NumOps for SoftFloat16 {}
-
-impl Add for SoftFloat16 {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self {
-        match (self, other) {
-            (NAN, _) => return NAN,
-            (_, NAN) => return NAN,
-            (POS_ZERO, POS_ZERO) => return POS_ZERO,
-            (POS_ZERO, NEG_ZERO) => return POS_ZERO,
-            (NEG_ZERO, POS_ZERO) => return POS_ZERO,
-            (NEG_ZERO, NEG_ZERO) => return NEG_ZERO,
-            (POS_ZERO, _) => return other,
-            (NEG_ZERO, _) => return other,
-            (_, POS_ZERO) => return self,
-            (_, NEG_ZERO) => return self,
-            (POS_INFINITY, NEG_INFINITY) => return NAN,
-            (NEG_INFINITY, POS_INFINITY) => return NAN,
-            (POS_INFINITY, _) => return POS_INFINITY,
-            (NEG_INFINITY, _) => return NEG_INFINITY,
-            (_, POS_INFINITY) => return POS_INFINITY,
-            (_, NEG_INFINITY) => return NEG_INFINITY,
-            _ => (),
-        };
-
-        let (sign0, exponent0, significand0) = (
-            Self::sign(self),
-            Self::exponent(self),
-            Self::significand(self),
-        );
-        let (sign1, exponent1, significand1) = (
-            Self::sign(other),
-            Self::exponent(other),
-            Self::significand(other),
-        );
-
-        // numbers only differ in sign, so result is POS_ZERO
-        if sign0 != sign1 && exponent0 == exponent1 && significand0 == significand1 {
-            return POS_ZERO;
-        }
-
-        // handle denormals and implicit bit
-        let (exponent0, significand0) = if exponent0 == 0 {
-            (1, significand0)
-        } else {
-            (exponent0, significand0 | 0x400)
-        };
-
-        let (exponent1, significand1) = if exponent1 == 0 {
-            (1, significand1)
-        } else {
-            (exponent1, significand1 | 0x400)
-        };
-
-        // make sure that first number has larger or equal exponent to make
-        // subsequent logic easier
-        let (sign0, exponent0, significand0, sign1, exponent1, significand1) =
-            if exponent0 >= exponent1 {
-                (
-                    sign0,
-                    exponent0,
-                    significand0,
-                    sign1,
-                    exponent1,
-                    significand1,
-                )
-            } else {
-                (
-                    sign1,
-                    exponent1,
-                    significand1,
-                    sign0,
-                    exponent0,
-                    significand0,
-                )
-            };
-
-        let shift = exponent0 - exponent1;
-
-        // if shifting operation would throw out all bits (even beyond guard,
-        // round, sticky) it's like adding zero, so we can just return early
-        if shift >= 13 {
-            return Self(sign0 << 15 | exponent0 << 10 | significand0 & 0x3FF);
-        }
-
-        // insert guard, round, sticky bits
-        let significand0 = significand0 << 3;
-        let significand1 = significand1 << 3;
-        let sticky_bits = (1 << (shift + 3 - 2)) - 1;
-        let sticky = if significand1 & sticky_bits == 0 {
-            0
-        } else {
-            1
-        };
-
-        // align decimal point of second number
-        let significand1 = (significand1 >> shift) | sticky;
-
-        // if signs are equal add significands, otherwise subtract
-        let (sign, exponent, significand) = if sign0 == sign1 {
-            let (sign, exponent, significand) = (sign0, exponent0, significand0 + significand1);
-            if significand & (1 << (11 + 3)) == 0 {
-                (sign, exponent, significand)
-            } else {
-                // need to realign decimal point
-                let significand = (significand >> 1) | sticky;
-                let exponent = exponent + 1;
-                if exponent >= 0x1F {
-                    // overflow
-                    return if sign == 0 {
-                        POS_INFINITY
-                    } else {
-                        NEG_INFINITY
-                    };
-                }
-                (sign, exponent, significand)
-            }
-        } else {
-            // always subtract smaller from larger significand and pick
-            // corresponding sign
-            let (sign, mut exponent, mut significand) = if significand0 >= significand1 {
-                (sign0, exponent0, significand0 - significand1)
-            } else {
-                (sign1, exponent0, significand1 - significand0)
-            };
-            while significand & (1 << (10 + 3)) == 0 && exponent > 1 {
-                // realign decimal point
-                significand <<= 1;
-                exponent -= 1;
-            }
-            (sign, exponent, significand)
-        };
-
-        // rounding
-        let grs = significand & 0x7;
-        let significand = significand >> 3;
-        let lsb = significand & 1;
-        let rnd = if grs < 0x4 || (grs == 0x4 && lsb == 0) {
-            // round down
-            0
-        } else {
-            // round up
-            1
-        };
-
-        if exponent == 1 && significand < 0x400 {
-            // denormal number
-            Self(sign << 15 | significand + rnd)
-        } else {
-            // normal number
-            Self(sign << 15 | (exponent << 10 | significand & 0x3FF) + rnd)
-        }
-    }
-}
-
 impl Div for SoftFloat16 {
     type Output = Self;
 
     fn div(self, other: Self) -> Self {
         todo!()
-    }
-}
-
-impl Mul for SoftFloat16 {
-    type Output = Self;
-
-    fn mul(self, other: Self) -> Self {
-        match (self, other) {
-            (NAN, _) => return NAN,
-            (_, NAN) => return NAN,
-            (POS_ZERO, POS_INFINITY) => return NAN,
-            (NEG_ZERO, POS_INFINITY) => return NAN,
-            (POS_ZERO, NEG_INFINITY) => return NAN,
-            (NEG_ZERO, NEG_INFINITY) => return NAN,
-            (POS_INFINITY, POS_ZERO) => return NAN,
-            (POS_INFINITY, NEG_ZERO) => return NAN,
-            (NEG_INFINITY, POS_ZERO) => return NAN,
-            (NEG_INFINITY, NEG_ZERO) => return NAN,
-            _ => (),
-        };
-
-        let (sign0, exponent0, significand0) = (
-            Self::sign(self),
-            Self::exponent(self),
-            Self::significand(self),
-        );
-        let (sign1, exponent1, significand1) = (
-            Self::sign(other),
-            Self::exponent(other),
-            Self::significand(other),
-        );
-
-        match (self, other) {
-            (POS_INFINITY, _) => {
-                return if sign1 == 0 {
-                    POS_INFINITY
-                } else {
-                    NEG_INFINITY
-                }
-            }
-            (NEG_INFINITY, _) => {
-                return if sign1 == 0 {
-                    NEG_INFINITY
-                } else {
-                    POS_INFINITY
-                }
-            }
-            (_, POS_INFINITY) => {
-                return if sign0 == 0 {
-                    POS_INFINITY
-                } else {
-                    NEG_INFINITY
-                }
-            }
-            (_, NEG_INFINITY) => {
-                return if sign0 == 0 {
-                    NEG_INFINITY
-                } else {
-                    POS_INFINITY
-                }
-            }
-            (POS_ZERO, _) => return if sign1 == 0 { POS_ZERO } else { NEG_ZERO },
-            (NEG_ZERO, _) => return if sign1 == 0 { NEG_ZERO } else { POS_ZERO },
-            (_, POS_ZERO) => return if sign0 == 0 { POS_ZERO } else { NEG_ZERO },
-            (_, NEG_ZERO) => return if sign0 == 0 { NEG_ZERO } else { POS_ZERO },
-            _ => (),
-        };
-
-        let sign = sign0 ^ sign1;
-
-        // handle denormals and implicit bit
-        let (exponent0, significand0) = if exponent0 == 0 {
-            (1, significand0)
-        } else {
-            (exponent0, significand0 | 0x400)
-        };
-
-        let (exponent1, significand1) = if exponent1 == 0 {
-            (1, significand1)
-        } else {
-            (exponent1, significand1 | 0x400)
-        };
-
-        let exponent = (exponent0 + exponent1) as i16 - 15;
-        assert!(exponent >= -15);
-        assert!(exponent <= 60);
-
-        let significand = (significand0 as u32) * (significand1 as u32);
-        assert!(significand < (1 << (12 + 10)));
-
-        // (try to) normalize
-        let (exponent, significand) = if significand & (1 << (11 + 10)) != 0 {
-            // decimal point too far right
-            let exponent = exponent + 1;
-            let sticky = (significand & 1 != 0) as u32;
-            let significand = (significand >> 1) | sticky;
-            (exponent, significand)
-        } else {
-            // decimal point too far left
-            let mut exponent = exponent;
-            let mut significand = significand;
-            while significand & (1 << (10 + 10)) == 0 && exponent > 1 {
-                significand <<= 1;
-                exponent -= 1;
-            }
-            (exponent, significand)
-        };
-
-        if exponent >= 0x1F {
-            // overflow
-            return if sign == 0 {
-                POS_INFINITY
-            } else {
-                NEG_INFINITY
-            };
-        }
-
-        // keep lowest three bits for guard, round, sticky bits
-        let sticky_bits = (1 << (10 - 2)) - 1;
-        let sticky = (significand & sticky_bits != 0) as u16;
-        let significand = ((significand >> 7) as u16) | sticky;
-
-        let (exponent, significand) = if exponent < -11 {
-            // underflow
-            return Self(sign << 15);
-        } else if exponent <= 0 {
-            // make exponent representable by shifting significand
-            let shift = 1 - exponent;
-            let sticky_bits = (1 << (shift + 3 - 2)) - 1;
-            let sticky = (significand & sticky_bits != 0) as u16;
-            let significand = (significand >> shift) | sticky;
-            (1, significand)
-        } else {
-            (exponent as u16, significand)
-        };
-
-        // rounding
-        let grs = significand & 0x7;
-        let significand = significand >> 3;
-        let lsb = significand & 1;
-        let rnd = if grs < 0x4 || (grs == 0x4 && lsb == 0) {
-            // round down
-            0
-        } else {
-            // round up
-            1
-        };
-
-        if exponent == 1 && significand < 0x400 {
-            // denormal number
-            Self(sign << 15 | significand + rnd)
-        } else {
-            // normal number
-            Self(sign << 15 | (exponent << 10 | significand & 0x3FF) + rnd)
-        }
     }
 }
 
@@ -547,11 +230,11 @@ impl fmt::Display for SoftFloat16 {
     }
 }
 
-impl fmt::LowerHex for SoftFloat16 {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::LowerHex::fmt(&SoftFloat16::to_bits(*self), f)
-    }
-}
+// impl fmt::LowerHex for SoftFloat16 {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         fmt::LowerHex::fmt(&SoftFloat16::to_bits(*self), f)
+//     }
+// }
 
 impl From<f32> for SoftFloat16 {
     fn from(value: f32) -> Self {
@@ -559,10 +242,14 @@ impl From<f32> for SoftFloat16 {
     }
 }
 
+impl From<SoftFloat16> for f32 {
+    fn from(value: SoftFloat16) -> Self {
+        todo!()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    // use crate::types::Float16;
-
     use super::*;
 
     // #[test]
@@ -605,118 +292,6 @@ mod tests {
     //             assert!(Float16::is_nan(y));
     //         } else {
     //             assert_eq!(SoftFloat16::to_bits(x), Float16::to_bits(y));
-    //         }
-    //     }
-    // }
-
-    #[test]
-    fn test_add() {
-        for ((v0, v1), expected) in [
-            ((0x87FF, 0xE850), 0xE850),
-            ((0x0000, 0x857F), 0x857F),
-            ((0x74FB, 0xE879), 0x746C),
-            ((0x7978, 0x0001), 0x7978),
-            ((0x0000, 0x0000), 0x0000),
-            ((0xC19A, 0xCFEB), 0xD04F),
-            ((0x0200, 0x0200), 0x0400),
-            ((0x0301, 0x0101), 0x0402),
-            ((30721, 30721), 31744),
-            ((1025, 34816), 33791),
-            ((32768, 0), 0),
-            ((32769, 1), 0),
-            ((0x7F02, 0x7BE3), 0x7F02),
-        ] {
-            let x0 = SoftFloat16::from_bits(v0);
-            let x1 = SoftFloat16::from_bits(v1);
-            let y = x0 + x1;
-            assert_eq!(SoftFloat16::to_bits(y), expected);
-        }
-    }
-
-    impl From<SoftFloat16> for f32 {
-        fn from(value: SoftFloat16) -> Self {
-            todo!()
-        }
-    }
-
-    // #[test]
-    // fn test_all_add() {
-    //     for i in 0..u16::MAX {
-    //         for j in 0..u16::MAX {
-    //             let x0_sf = SoftFloat16::from_bits(i);
-    //             let x1_sf = SoftFloat16::from_bits(j);
-    //             let y_sf = x0_sf + x1_sf;
-    //             let x0_f = f32::from(x0_sf);
-    //             let x1_f = Float16::from_bits(j);
-    //             let y_f = x0_f + x1_f;
-    //             if y_sf == NAN {
-    //                 assert!(Float16::is_nan(y_f));
-    //             } else {
-    //                 assert_eq!(
-    //                     SoftFloat16::to_bits(y_sf),
-    //                     Float16::to_bits(y_f),
-    //                     "{:?}",
-    //                     (i, j)
-    //                 );
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_mul() {
-    //     for ((v0, v1), expected) in [
-    //         // ((0x200, 0x200), 0x0),
-    //         // ((0x3c04, 0x3c04), 0x3C08),
-    //         // ((513, 5117), 1),
-    //         // ((1025, 4095), 1),
-    //         // ((1025, 16383), 2048),
-    //         // ((1057, 14305), 521),
-    //         // ((15362, 31742), 31744),
-    //         ((16384, 30721), 31744),
-    //     ] {
-    //         let x0 = SoftFloat16::from_bits(v0);
-    //         let x1 = SoftFloat16::from_bits(v1);
-    //         println!("{:016b} x0", x0.0);
-    //         println!("{:016b} x1", x1.0);
-
-    //         let y = x0 * x1;
-
-    //         println!("{:016b} y", y.0);
-    //         println!("{:016b} expected", expected);
-
-    //         assert_eq!(SoftFloat16::to_bits(y), expected);
-    //     }
-    // }
-
-    // #[test]
-    // fn test_all_mul() {
-    //     for i in 0..u16::MAX {
-    //         if i % 1000 == 0 {
-    //             println!("{}", i);
-    //         }
-    //         for j in 0..u16::MAX {
-    //             let x0_sf = SoftFloat16::from_bits(i);
-    //             let x1_sf = SoftFloat16::from_bits(j);
-    //             let y_sf = x0_sf * x1_sf;
-    //             let x0_f = Float16::from_bits(i);
-    //             let x1_f = Float16::from_bits(j);
-    //             let y_f = x0_f * x1_f;
-    //             if y_sf == NAN {
-    //                 assert!(Float16::is_nan(y_f));
-    //             } else {
-    //                 // println!("{:016b} x0", x0_sf.0);
-    //                 // println!("{:016b} x1", x1_sf.0);
-
-    //                 // println!("{:016b} y", y_sf.0);
-    //                 // println!("{:016b} expected\n", y_f.0);
-    //                 assert_eq!(
-    //                     SoftFloat16::to_bits(y_sf),
-    //                     Float16::to_bits(y_f),
-    //                     "{:?}",
-    //                     (i, j)
-    //                 );
-    //             }
     //         }
     //     }
     // }
