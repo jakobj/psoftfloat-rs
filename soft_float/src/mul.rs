@@ -162,61 +162,51 @@ impl Mul for SoftFloat16 {
 mod tests {
     use super::*;
 
-    // #[test]
-    // fn test_mul() {
-    //     for ((v0, v1), expected) in [
-    //         // ((0x200, 0x200), 0x0),
-    //         // ((0x3c04, 0x3c04), 0x3C08),
-    //         // ((513, 5117), 1),
-    //         // ((1025, 4095), 1),
-    //         // ((1025, 16383), 2048),
-    //         // ((1057, 14305), 521),
-    //         // ((15362, 31742), 31744),
-    //         ((16384, 30721), 31744),
-    //     ] {
-    //         let x0 = SoftFloat16::from_bits(v0);
-    //         let x1 = SoftFloat16::from_bits(v1);
-    //         println!("{:016b} x0", x0.0);
-    //         println!("{:016b} x1", x1.0);
+    #[test]
+    fn test_mul() {
+        for ((v0, v1), expected) in [
+            ((0x200, 0x200), 0x0),
+            ((0x3c04, 0x3c04), 0x3C08),
+            ((513, 5117), 1),
+            ((1025, 4095), 1),
+            ((1025, 16383), 2048),
+            ((1057, 14305), 521),
+            ((15362, 31742), 31744),
+            ((16384, 30721), 31744),
+        ] {
+            let x0 = SoftFloat16::from_bits(v0);
+            let x1 = SoftFloat16::from_bits(v1);
 
-    //         let y = x0 * x1;
+            let y = x0 * x1;
 
-    //         println!("{:016b} y", y.0);
-    //         println!("{:016b} expected", expected);
+            assert_eq!(SoftFloat16::to_bits(y), expected);
+        }
+    }
 
-    //         assert_eq!(SoftFloat16::to_bits(y), expected);
-    //     }
-    // }
-
-    // #[test]
-    // fn test_all_mul() {
-    //     for i in 0..u16::MAX {
-    //         if i % 1000 == 0 {
-    //             println!("{}", i);
-    //         }
-    //         for j in 0..u16::MAX {
-    //             let x0_sf = SoftFloat16::from_bits(i);
-    //             let x1_sf = SoftFloat16::from_bits(j);
-    //             let y_sf = x0_sf * x1_sf;
-    //             let x0_f = Float16::from_bits(i);
-    //             let x1_f = Float16::from_bits(j);
-    //             let y_f = x0_f * x1_f;
-    //             if y_sf == NAN {
-    //                 assert!(Float16::is_nan(y_f));
-    //             } else {
-    //                 // println!("{:016b} x0", x0_sf.0);
-    //                 // println!("{:016b} x1", x1_sf.0);
-
-    //                 // println!("{:016b} y", y_sf.0);
-    //                 // println!("{:016b} expected\n", y_f.0);
-    //                 assert_eq!(
-    //                     SoftFloat16::to_bits(y_sf),
-    //                     Float16::to_bits(y_f),
-    //                     "{:?}",
-    //                     (i, j)
-    //                 );
-    //             }
-    //         }
-    //     }
-    // }
+    #[test]
+    #[ignore]
+    fn test_all_mul() {
+        for i in 0..u16::MAX {
+            if i % 1000 == 0 {
+                println!("{}", i);
+            }
+            for j in 0..u16::MAX {
+                let x0_sf = SoftFloat16::from_bits(i);
+                let x1_sf = SoftFloat16::from_bits(j);
+                let y_sf = x0_sf * x1_sf;
+                let y_f = SoftFloat16::from(f32::from(x0_sf) * f32::from(x1_sf));
+                if y_sf == NAN || y_f == NAN {
+                    assert!(y_sf == NAN);
+                    assert!(y_f == NAN);
+                } else {
+                    assert_eq!(
+                        SoftFloat16::to_bits(y_sf),
+                        SoftFloat16::to_bits(y_f),
+                        "{:?}",
+                        (i, j)
+                    );
+                }
+            }
+        }
+    }
 }
