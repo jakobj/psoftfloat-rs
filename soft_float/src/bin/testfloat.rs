@@ -136,15 +136,15 @@ fn testfloat<
             // // sqrt
             // // rem
             // // eq, le, lt
-            // "to" => {
-            //     let result = T_IN::hex_str_to_float(words[0]);
-            //     format!(
-            //         "{} {} {}",
-            //         words[0],
-            //         T_OUT::float_to_hex_str(T_OUT::from(result)),
-            //         words[2]
-            //     )
-            // }
+            "to" => {
+                let result = T_IN::hex_str_to_float(words[0]);
+                format!(
+                    "{} {} {}",
+                    words[0],
+                    T_OUT::float_to_hex_str(T_OUT::from(result)),
+                    words[2]
+                )
+            }
             _ => todo!(),
         };
 
