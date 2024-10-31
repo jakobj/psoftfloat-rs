@@ -184,27 +184,27 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_all_add() {
-    //     for i in 0..u16::MAX {
-    //         for j in 0..u16::MAX {
-    //             let x0_sf = SoftFloat16::from_bits(i);
-    //             let x1_sf = SoftFloat16::from_bits(j);
-    //             let y_sf = x0_sf + x1_sf;
-    //             let x0_f = f32::from(x0_sf);
-    //             let x1_f = Float16::from_bits(j);
-    //             let y_f = x0_f + x1_f;
-    //             if y_sf == NAN {
-    //                 assert!(Float16::is_nan(y_f));
-    //             } else {
-    //                 assert_eq!(
-    //                     SoftFloat16::to_bits(y_sf),
-    //                     Float16::to_bits(y_f),
-    //                     "{:?}",
-    //                     (i, j)
-    //                 );
-    //             }
-    //         }
-    //     }
-    // }
+    #[test]
+    #[ignore]
+    fn test_all_add() {
+        for i in 0..u16::MAX {
+            for j in 0..u16::MAX {
+                let x0_sf = SoftFloat16::from_bits(i);
+                let x1_sf = SoftFloat16::from_bits(j);
+                let y_sf = x0_sf + x1_sf;
+                let y_f = SoftFloat16::from(f32::from(x0_sf) + f32::from(x1_sf));
+                if y_sf == NAN || y_f == NAN {
+                    assert!(y_sf == NAN);
+                    assert!(y_f == NAN);
+                } else {
+                    assert_eq!(
+                        SoftFloat16::to_bits(y_sf),
+                        SoftFloat16::to_bits(y_f),
+                        "{:?}",
+                        (i, j)
+                    );
+                }
+            }
+        }
+    }
 }
