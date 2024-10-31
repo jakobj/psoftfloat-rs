@@ -46,26 +46,6 @@ impl Div for SoftFloat16 {
     }
 }
 
-impl Neg for SoftFloat16 {
-    type Output = Self;
-
-    fn neg(self) -> Self {
-        if self == NAN {
-            NAN
-        } else {
-            Self(self.0 ^ (1 << 15))
-        }
-    }
-}
-
-impl Sub for SoftFloat16 {
-    type Output = Self;
-
-    fn sub(self, other: Self) -> Self {
-        self + -other
-    }
-}
-
 fn decompose_f32(v: f32) -> String {
     let bits = v.to_bits();
     let sign = (bits >> 31) as u16;
