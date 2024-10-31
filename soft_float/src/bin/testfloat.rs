@@ -16,6 +16,7 @@ fn main() {
     let type_out = split.next().unwrap_or(type_in);
 
     match (type_in, type_out) {
+        ("softfloat16", "f32") => testfloat::<SoftFloat16, f32>(op),
         ("f32", "softfloat16") => testfloat::<f32, SoftFloat16>(op),
         ("softfloat16", "softfloat16") => testfloat::<SoftFloat16, SoftFloat16>(op),
         _ => todo!(),

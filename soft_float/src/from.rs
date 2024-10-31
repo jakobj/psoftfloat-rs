@@ -87,6 +87,54 @@ impl From<f32> for SoftFloat16 {
 
 impl From<SoftFloat16> for f32 {
     fn from(value: SoftFloat16) -> Self {
-        todo!()
+        match value {
+            NAN => return f32::NAN,
+            POS_INFINITY => return f32::INFINITY,
+            NEG_INFINITY => return f32::NEG_INFINITY,
+            POS_ZERO => return 0.0_f32,
+            NEG_ZERO => return -0.0_f32,
+            _ => (),
+        };
+
+        let sign = SoftFloat16::sign(value) as u32;
+        let exponent = SoftFloat16::exponent(value) as u32;
+        let significand = SoftFloat16::significand(value) as u32;
+
+        // handle denormals and implicit bit
+        let (exponent, significand) = if exponent == 0 {
+            (1, significand)
+        } else {
+            (exponent, significand | 0x400)
+        };
+
+        let mut exponent = exponent + 127 - 15;
+        let mut significand = significand << 13;
+
+        while significand & (1 << 23) == 0 && exponent > 1 {
+            // realign decimal point if necessary (only happens for denormal
+            // numbers)
+            significand <<= 1;
+            exponent -= 1;
+        }
+
+        f32::from_bits(sign << 31 | exponent << 23 | significand & 0x7fffff)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_f32_from_softfloat16() {
+        for (v, expected) in [
+            (0x97db, 0xbafb6000_u32),
+            (0xe850, 0xc50a0000_u32),
+            (0x1, 0x33800000),
+        ] {
+            let x = SoftFloat16::from_bits(v);
+            let y = f32::from(x);
+            assert_eq!(y.to_bits(), expected)
+        }
     }
 }
