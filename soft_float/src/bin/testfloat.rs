@@ -1,8 +1,11 @@
 use std::{
-    env, fmt::Debug, io::{self, BufRead}, ops::{Add, Div, Mul, Sub}
+    env,
+    fmt::Debug,
+    io::{self, BufRead},
+    ops::{Add, Div, Mul, Sub},
 };
 
-use soft_float::{SoftFloat16};
+use soft_float::SoftFloat16;
 
 fn main() {
     let args = env::args().collect::<Vec<String>>();
@@ -55,8 +58,14 @@ impl ConvertHexStr for SoftFloat16 {
 }
 
 fn testfloat<
-    T_IN: ConvertHexStr + Add<Output = T_IN> + Sub<Output = T_IN> + Mul<Output = T_IN> + Div + Debug + Copy,
-    T_OUT: ConvertHexStr + From<T_IN> + Debug + Copy
+    T_IN: ConvertHexStr
+        + Add<Output = T_IN>
+        + Sub<Output = T_IN>
+        + Mul<Output = T_IN>
+        + Div
+        + Debug
+        + Copy,
+    T_OUT: ConvertHexStr + From<T_IN> + Debug + Copy,
 >(
     op: &str,
 ) {
