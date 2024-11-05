@@ -38,14 +38,6 @@ impl SoftFloat16 {
     }
 }
 
-impl Div for SoftFloat16 {
-    type Output = Self;
-
-    fn div(self, other: Self) -> Self {
-        todo!()
-    }
-}
-
 fn decompose_f32(v: f32) -> String {
     let bits = v.to_bits();
     let sign = (bits >> 31) as u16;
