@@ -20,3 +20,4 @@ This implementation is for educational purposes only. It is explicitly not optim
 - https://pages.cs.wisc.edu/~david/courses/cs552/S12/handouts/guardbits.pdf
 - https://github.com/koute/softfloat
 - https://github.com/823984418/const_soft_float
+- https://github.com/skeeto/scratch/blob/master/misc/float16.c
