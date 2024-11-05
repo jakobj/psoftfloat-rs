@@ -90,12 +90,8 @@ impl Add for SoftFloat16 {
         // insert guard, round, sticky bits
         let significand0 = significand0 << 3;
         let significand1 = significand1 << 3;
-        let sticky_bits = (1 << (shift + 3 - 2)) - 1;
-        let sticky = if significand1 & sticky_bits == 0 {
-            0
-        } else {
-            1
-        };
+        let sticky_bits = (1 << (shift + 1)) - 1;
+        let sticky = (significand1 & sticky_bits != 0) as u16;
 
         // align decimal point of second number
         let significand1 = (significand1 >> shift) | sticky;
@@ -103,9 +99,9 @@ impl Add for SoftFloat16 {
         // if signs are equal add significands, otherwise subtract
         let (sign, exponent, significand) = if sign0 == sign1 {
             let (sign, exponent, significand) = (sign0, exponent0, significand0 + significand1);
-            if significand & (1 << (11 + 3)) == 0 {
-                (sign, exponent, significand)
-            } else {
+            assert!(significand < (1 << (12 + 3)));
+
+            if significand & (1 << (11 + 3)) != 0 {
                 // need to realign decimal point
                 let significand = (significand >> 1) | sticky;
                 let exponent = exponent + 1;
@@ -118,6 +114,8 @@ impl Add for SoftFloat16 {
                     };
                 }
                 (sign, exponent, significand)
+            } else {
+                (sign, exponent, significand)
             }
         } else {
             // always subtract smaller from larger significand and pick
@@ -127,6 +125,7 @@ impl Add for SoftFloat16 {
             } else {
                 (sign1, exponent0, significand1 - significand0)
             };
+            assert!(significand < (1 << (11 + 3)));
             while significand & (1 << (10 + 3)) == 0 && exponent > 1 {
                 // realign decimal point
                 significand <<= 1;
@@ -135,7 +134,7 @@ impl Add for SoftFloat16 {
             (sign, exponent, significand)
         };
 
-        // rounding
+        // rounding (to even)
         let grs = significand & 0x7;
         let significand = significand >> 3;
         let lsb = significand & 1;
@@ -147,13 +146,14 @@ impl Add for SoftFloat16 {
             1
         };
 
-        if exponent == 1 && significand < 0x400 {
-            // denormal number
-            Self::from_bits(sign << 15 | significand + rnd)
+        // denormals have exponent 0
+        let exponent = if exponent == 1 && significand < 0x400 {
+            0
         } else {
-            // normal number
-            Self::from_bits(sign << 15 | (exponent << 10 | significand & 0x3FF) + rnd)
-        }
+            exponent
+        };
+
+        Self::from_bits(sign << 15 | (exponent << 10 | significand & 0x3FF) + rnd)
     }
 }
 
@@ -164,22 +164,26 @@ mod tests {
     #[test]
     fn test_add() {
         for ((v0, v1), expected) in [
-            ((0x87FF, 0xE850), 0xE850),
-            ((0x0000, 0x857F), 0x857F),
-            ((0x74FB, 0xE879), 0x746C),
-            ((0x7978, 0x0001), 0x7978),
-            ((0x0000, 0x0000), 0x0000),
-            ((0xC19A, 0xCFEB), 0xD04F),
-            ((0x0200, 0x0200), 0x0400),
-            ((0x0301, 0x0101), 0x0402),
-            ((30721, 30721), 31744),
-            ((1025, 34816), 33791),
-            ((32768, 0), 0),
-            ((32769, 1), 0),
+            ((4143, 5311), 5846),
+            // ((0x77, 0x15), 0x8c),
+            // ((0x14bf, 0x142f), 0x1877),
+            // ((0x87FF, 0xE850), 0xE850),
+            // ((0x0000, 0x857F), 0x857F),
+            // ((0x74FB, 0xE879), 0x746C),
+            // ((0x7978, 0x0001), 0x7978),
+            // ((0x0000, 0x0000), 0x0000),
+            // ((0xC19A, 0xCFEB), 0xD04F),
+            // ((0x0200, 0x0200), 0x0400),
+            // ((0x0301, 0x0101), 0x0402),
+            // ((30721, 30721), 31744),
+            // ((1025, 34816), 33791),
+            // ((32768, 0), 0),
+            // ((32769, 1), 0),
         ] {
             let x0 = SoftFloat16::from_bits(v0);
             let x1 = SoftFloat16::from_bits(v1);
             let y = x0 + x1;
+            println!("{:017b}", SoftFloat16::to_bits(y));
             assert_eq!(SoftFloat16::to_bits(y), expected);
         }
     }

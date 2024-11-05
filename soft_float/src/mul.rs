@@ -118,7 +118,7 @@ impl Mul for SoftFloat16 {
         }
 
         // keep lowest three bits for guard, round, sticky bits
-        let sticky_bits = (1 << (10 - 2)) - 1;
+        let sticky_bits = (1 << (7 + 1)) - 1;
         let sticky = (significand & sticky_bits != 0) as u16;
         let significand = ((significand >> 7) as u16) | sticky;
 
@@ -126,9 +126,10 @@ impl Mul for SoftFloat16 {
             // underflow
             return Self::from_bits(sign << 15);
         } else if exponent <= 0 {
-            // make exponent representable by shifting significand
+            // must convert to denormal number; make exponent representable by
+            // shifting significand
             let shift = 1 - exponent;
-            let sticky_bits = (1 << (shift + 3 - 2)) - 1;
+            let sticky_bits = (1 << (shift + 1)) - 1;
             let sticky = (significand & sticky_bits != 0) as u16;
             let significand = (significand >> shift) | sticky;
             (1, significand)
@@ -136,7 +137,7 @@ impl Mul for SoftFloat16 {
             (exponent as u16, significand)
         };
 
-        // rounding
+        // rounding (to even)
         let grs = significand & 0x7;
         let significand = significand >> 3;
         let lsb = significand & 1;
@@ -148,13 +149,14 @@ impl Mul for SoftFloat16 {
             1
         };
 
-        if exponent == 1 && significand < 0x400 {
-            // denormal number
-            Self::from_bits(sign << 15 | significand + rnd)
+        // denormals have exponent 0
+        let exponent = if exponent == 1 && significand < 0x400 {
+            0
         } else {
-            // normal number
-            Self::from_bits(sign << 15 | (exponent << 10 | significand & 0x3FF) + rnd)
-        }
+            exponent
+        };
+
+        Self::from_bits(sign << 15 | (exponent << 10 | significand & 0x3FF) + rnd)
     }
 }
 
