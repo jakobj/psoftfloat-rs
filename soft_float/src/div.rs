@@ -115,12 +115,13 @@ impl Div for SoftFloat16 {
         let significand = r | sticky;
         assert!(significand < (0x800 << 3));
         assert!(significand >= (0x100 << 3));
+        assert!((significand & (0x400 << 3)) != 0);
 
         if VERBOSE {
             println!("{:03}|{:024b} <- with sticky", exponent, significand);
         }
 
-        let (exponent, significand) = if exponent <= -10 {
+        let (exponent, significand) = if exponent < -11 {
             // underflow
             return Self::from_bits(sign << 15);
         } else if exponent <= 0 {
