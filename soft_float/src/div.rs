@@ -12,10 +12,12 @@ impl Div for SoftFloat16 {
             (_, NAN) => return NAN,
             (POS_ZERO, POS_ZERO) => return NAN,
             (POS_ZERO, NEG_ZERO) => return NAN,
+            (POS_ZERO, POS_INFINITY) => return POS_ZERO,
+            (POS_ZERO, NEG_INFINITY) => return NEG_ZERO,
             (NEG_ZERO, POS_ZERO) => return NAN,
             (NEG_ZERO, NEG_ZERO) => return NAN,
-            (_, POS_ZERO) => return POS_INFINITY,
-            (_, NEG_ZERO) => return NEG_INFINITY,
+            (NEG_ZERO, POS_INFINITY) => return NEG_ZERO,
+            (NEG_ZERO, NEG_INFINITY) => return POS_ZERO,
             _ => (),
         }
 
@@ -29,6 +31,14 @@ impl Div for SoftFloat16 {
             Self::exponent(other),
             Self::significand(other),
         );
+
+        match (self, other) {
+            (POS_ZERO, _) => return if sign1 == 0 { POS_ZERO } else { NEG_ZERO },
+            (NEG_ZERO, _) => return if sign1 == 0 { NEG_ZERO } else { POS_ZERO },
+            (_, POS_ZERO) => return if sign0 == 0 { POS_INFINITY } else { NEG_INFINITY },
+            (_, NEG_ZERO) => return if sign0 == 0 { NEG_INFINITY } else { POS_INFINITY },
+            _ => (),
+        }
 
         let sign = sign0 ^ sign1;
 
