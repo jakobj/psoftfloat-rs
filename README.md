@@ -21,3 +21,4 @@ This implementation is for educational purposes only. It is explicitly not optim
 - https://github.com/koute/softfloat
 - https://github.com/823984418/const_soft_float
 - https://github.com/skeeto/scratch/blob/master/misc/float16.c
+- https://cs.stackexchange.com/questions/80668/simple-algorithm-for-ieee-754-division-on-8-bit-cpu

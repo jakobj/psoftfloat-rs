@@ -7,7 +7,17 @@ impl Div for SoftFloat16 {
     type Output = Self;
 
     fn div(self, other: Self) -> Self {
-        // TODO handle NANs etc
+        match (self, other) {
+            (NAN, _) => return NAN,
+            (_, NAN) => return NAN,
+            (POS_ZERO, POS_ZERO) => return NAN,
+            (POS_ZERO, NEG_ZERO) => return NAN,
+            (NEG_ZERO, POS_ZERO) => return NAN,
+            (NEG_ZERO, NEG_ZERO) => return NAN,
+            (_, POS_ZERO) => return POS_INFINITY,
+            (_, NEG_ZERO) => return NEG_INFINITY,
+            _ => (),
+        }
 
         let (sign0, exponent0, significand0) = (
             Self::sign(self),
@@ -22,59 +32,68 @@ impl Div for SoftFloat16 {
 
         let sign = sign0 ^ sign1;
 
+        println!("{}|{:024b} <- before normalize 0", exponent0, significand0);
+        println!("{}|{:024b} <- before normalize 1", exponent1, significand1);
+
         // handle denormals and implicit bit
         let (exponent0, significand0) = if exponent0 == 0 {
-            (1, significand0)
-        } else {
-            (exponent0, significand0 | 0x400)
-        };
-
-        let (exponent1, significand1) = if exponent1 == 0 {
-            (1, significand1)
-        } else {
-            (exponent1, significand1 | 0x400)
-        };
-
-        let exponent = ((exponent0 - exponent1) as i16 + 15) as u16;
-        // TODO assert exponent range
-
-        // TODO large shift seems unnecessary, maybe we can get away with a shift of 3?
-        let significand = ((significand0 as u32) << (10 + 3)) / (significand1 as u32);
-        // if non-zero digits appear after the ones we have calculated, then z =
-        // x/y => x = y * z will not hold, but rather x > y * z; we use this as
-        // an easy way to determine the sticky bit
-        let sticky = if (significand0 as u32) - ((significand1 as u32) * significand) == 0 { 0 } else { 1 };
-        let significand = significand | sticky;
-        println!("{:09b}|{:024b} <- after div", exponent, significand);
-        // TODO normalize
-        let (exponent, significand) = if significand & (1 << (11 + 3)) != 0 {
-            let mut exponent = exponent;
-            let mut significand = significand;
-            let mut sticky;
-            // // decimal point too far right
-            // let exponent = exponent + 1;
-            // let sticky = (significand & 1 != 0) as u32;
-            // let significand = (significand >> 1) | sticky;
-            while significand > (0x800 << 3) {
-                sticky = significand & 1;
-                significand = (significand >> 1) | sticky;
-                exponent += 1;
-            }
-            (exponent, significand)
-        } else {
-            // decimal point too far left
-            let mut exponent = exponent;
-            let mut significand = significand;
-            // TODO do we ever shift more than one place here?
-            while significand & (1 << (10 + 3)) == 0 && exponent > 1 {
+            // normalize
+            let mut exponent = 1_i16;
+            let mut significand = significand0;
+            while significand & (1 << 10) == 0 {
                 significand <<= 1;
                 exponent -= 1;
             }
             (exponent, significand)
+        } else {
+            (exponent0 as i16, significand0 | 0x400)
         };
-        println!("{:09b}|{:024b} <- after shift", exponent, significand);
 
-        let significand = significand as u16;
+        let (exponent1, significand1) = if exponent1 == 0 {
+            // normalize
+            let mut exponent = 1_i16;
+            let mut significand = significand1;
+            while significand & (1 << 10) == 0 {
+                significand <<= 1;
+                exponent -= 1;
+            }
+            (exponent, significand)
+        } else {
+            (exponent1 as i16, significand1 | 0x400)
+        };
+        println!("{:02}|{:024b} <- after normalize 0", exponent0, significand0);
+        println!("{:02}|{:024b} <- after normalize 1", exponent1, significand1);
+
+        let exponent = (exponent0 - exponent1) + 15;
+        // TODO assert exponent range
+
+        // generate quotient one bit at a time using long division
+        let mut x = significand0;
+        let y = significand1;
+        let mut r = 0;
+        for _ in 0..(10 + 3) {
+            if x >= y {
+                x = x - y;
+                r = r | 1;
+            }
+            x <<= 1;
+            r <<= 1;
+        }
+        let sticky = (x != 0) as u16;
+        let significand = r | sticky;
+        assert!(significand < (0x800 << 3));
+        assert!(significand >= (0x100 << 3));
+
+        println!("{:02}|{:024b} <- after div", exponent, significand);
+
+        assert!(exponent > 0);
+        let (exponent, significand) = if significand & (0x400 << 3) == 0 {
+            ((exponent - 1) as u16, significand << 1)
+        } else {
+            (exponent as u16, significand)
+        };
+
+        println!("{:02}|{:024b} <- after shift", exponent, significand);
 
         // rounding (to even)
         let grs = significand & 0x7;
@@ -106,12 +125,14 @@ mod tests {
     #[test]
     fn test_div() {
         for (v0, v1) in [
-            // ((0x3c10, 0x3410), 0x4400),
-            // ((0x24ff, 0x75f), 0x596C),
+            (0x3c10, 0x3410),
+            (0x24ff, 0x75f),
             (0x24ff, 0x11),
-            // (0x400, 0x7ff),
-            // ((0x07ff, 0x400), 0x3fff),
-            // (0x07ff, 0x350),
+            (0x400, 0x7ff),
+            (0x07ff, 0x400),
+            (0x07ff, 0x350),
+            (0x1, 0x3),
+            (0x8, 0xab8),
         ] {
             let x0 = SoftFloat16::from_bits(v0);
             let x1 = SoftFloat16::from_bits(v1);
@@ -123,4 +144,27 @@ mod tests {
         }
     }
 
+    #[test]
+    #[ignore]
+    fn test_all_div() {
+        for i in 0..u16::MAX {
+            for j in 0..u16::MAX {
+                let x0_sf = SoftFloat16::from_bits(i);
+                let x1_sf = SoftFloat16::from_bits(j);
+                let y_sf = x0_sf / x1_sf;
+                let y_f = SoftFloat16::from(f32::from(x0_sf) / f32::from(x1_sf));
+                if y_sf == NAN || y_f == NAN {
+                    assert!(y_sf == NAN, "{:?}", (i, j));
+                    assert!(y_f == NAN, "{:?}", (i, j));
+                } else {
+                    assert_eq!(
+                        SoftFloat16::to_bits(y_sf),
+                        SoftFloat16::to_bits(y_f),
+                        "{:?}",
+                        (i, j)
+                    );
+                }
+            }
+        }
+    }
 }
