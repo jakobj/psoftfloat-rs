@@ -3,6 +3,8 @@ use std::ops::Div;
 use crate::soft_float16::{NAN, NEG_INFINITY, NEG_ZERO, POS_INFINITY, POS_ZERO};
 use crate::SoftFloat16;
 
+const VERBOSE: bool = false;
+
 impl Div for SoftFloat16 {
     type Output = Self;
 
@@ -14,14 +16,10 @@ impl Div for SoftFloat16 {
             (POS_ZERO, NEG_ZERO) => return NAN,
             (NEG_ZERO, POS_ZERO) => return NAN,
             (NEG_ZERO, NEG_ZERO) => return NAN,
-            (POS_INFINITY, POS_ZERO) => return NAN,
-            (POS_INFINITY, NEG_ZERO) => return NAN,
-            (NEG_INFINITY, POS_ZERO) => return NAN,
-            (NEG_INFINITY, NEG_ZERO) => return NAN,
-            (POS_ZERO, POS_INFINITY) => return POS_ZERO,
-            (POS_ZERO, NEG_INFINITY) => return NEG_ZERO,
-            (NEG_ZERO, POS_INFINITY) => return NEG_ZERO,
-            (NEG_ZERO, NEG_INFINITY) => return POS_ZERO,
+            (POS_INFINITY, POS_INFINITY) => return NAN,
+            (POS_INFINITY, NEG_INFINITY) => return NAN,
+            (NEG_INFINITY, POS_INFINITY) => return NAN,
+            (NEG_INFINITY, NEG_INFINITY) => return NAN,
             _ => (),
         }
 
@@ -50,8 +48,10 @@ impl Div for SoftFloat16 {
 
         let sign = sign0 ^ sign1;
 
-        println!("{}|{:024b} <- before normalize 0", exponent0, significand0);
-        println!("{}|{:024b} <- before normalize 1", exponent1, significand1);
+        if VERBOSE {
+            println!("{:03}|{:024b} <- before normalize 0", exponent0, significand0);
+            println!("{:03}|{:024b} <- before normalize 1", exponent1, significand1);
+        }
 
         // handle denormals and implicit bit
         let (exponent0, significand0) = if exponent0 == 0 {
@@ -79,39 +79,70 @@ impl Div for SoftFloat16 {
         } else {
             (exponent1 as i16, significand1 | 0x400)
         };
-        println!("{:02}|{:024b} <- after normalize 0", exponent0, significand0);
-        println!("{:02}|{:024b} <- after normalize 1", exponent1, significand1);
+        if VERBOSE {
+            println!("{:03}|{:024b} <- after normalize 0", exponent0, significand0);
+            println!("{:03}|{:024b} <- after normalize 1", exponent1, significand1);
+        }
 
-        let exponent = (exponent0 - exponent1) + 15;
-        // TODO assert exponent range
+        let mut exponent = (exponent0 - exponent1) + 15;
 
-        // generate quotient one bit at a time using long division
         let mut x = significand0;
         let y = significand1;
+
+        // we make sure that dividend is always larger than the divisor s/t that
+        // we are certain to obtain a normalized number (a 1 followed by 10
+        // decimal places)
+        if x < y {
+            x <<= 1;
+            exponent -= 1;
+        };
+
+        // generate (11 bits + 3 GRS bits) quotient one bit at a time using long division
         let mut r = 0;
         for _ in 0..(10 + 3) {
             if x >= y {
-                x = x - y;
                 r = r | 1;
+                x = x - y;
             }
-            x <<= 1;
             r <<= 1;
+            x <<= 1;
         }
+        if VERBOSE {
+            println!("{:03}|{:024b} <- after div", exponent, r);
+        }
+
         let sticky = (x != 0) as u16;
         let significand = r | sticky;
         assert!(significand < (0x800 << 3));
         assert!(significand >= (0x100 << 3));
 
-        println!("{:02}|{:024b} <- after div", exponent, significand);
+        if VERBOSE {
+            println!("{:03}|{:024b} <- with sticky", exponent, significand);
+        }
 
-        assert!(exponent > 0);
-        let (exponent, significand) = if significand & (0x400 << 3) == 0 {
-            ((exponent - 1) as u16, significand << 1)
+        let (exponent, significand) = if exponent <= -10 {
+            // underflow
+            return Self::from_bits(sign << 15);
+        } else if exponent <= 0 {
+            // must convert to denormal number; make exponent representable by
+            // shifting significand
+            let shift = 1 - exponent;
+            if VERBOSE {
+                println!("{} {}", shift, sticky);
+            }
+            let sticky_bits = (1 << (shift + 1)) - 1;
+            let sticky = (significand & sticky_bits != 0) as u16;
+            let significand = (significand >> shift) | sticky;
+            (1, significand)
+        } else if exponent >= 0x1F {
+            return if sign == 0 { POS_INFINITY } else { NEG_INFINITY };
         } else {
             (exponent as u16, significand)
         };
 
-        println!("{:02}|{:024b} <- after shift", exponent, significand);
+        if VERBOSE {
+            println!("{:03}|{:024b} <- after shift", exponent, significand);
+        }
 
         // rounding (to even)
         let grs = significand & 0x7;
@@ -149,8 +180,17 @@ mod tests {
             (0x400, 0x7ff),
             (0x07ff, 0x400),
             (0x07ff, 0x350),
+            (0x400, 0x401),
             (0x1, 0x3),
             (0x8, 0xab8),
+            (0x1, 0x1401),
+            (0x1, 0x1800),
+            (0x1, 0x3c01),
+            (4, 5),
+            (0x1c01, 0x1),
+            (0x7c00, 0x0),
+            (0x7c00, 0x7c00),
+            (1, 0),
         ] {
             let x0 = SoftFloat16::from_bits(v0);
             let x1 = SoftFloat16::from_bits(v1);

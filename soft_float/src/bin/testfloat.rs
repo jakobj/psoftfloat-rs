@@ -63,7 +63,7 @@ fn testfloat<
         + Add<Output = T_IN>
         + Sub<Output = T_IN>
         + Mul<Output = T_IN>
-        + Div
+        + Div<Output = T_IN>
         + Debug
         + Copy,
     T_OUT: ConvertHexStr + From<T_IN> + Debug + Copy,
@@ -120,20 +120,20 @@ fn testfloat<
                     words[3]
                 )
             }
-            // "div" => {
-            //     let (value0, value1) = (
-            //         T_IN::hex_str_to_float(words[0]),
-            //         T_IN::hex_str_to_float(words[1]),
-            //     );
-            //     let result = T_IN::div(value0, value1);
-            //     format!(
-            //         "{} {} {} {}",
-            //         words[0],
-            //         words[1],
-            //         T_OUT::float_to_hex_str(T_OUT::from(result)),
-            //         words[3]
-            //     )
-            // }
+            "div" => {
+                let (value0, value1) = (
+                    T_IN::hex_str_to_float(words[0]),
+                    T_IN::hex_str_to_float(words[1]),
+                );
+                let result = T_IN::div(value0, value1);
+                format!(
+                    "{} {} {} {}",
+                    words[0],
+                    words[1],
+                    T_OUT::float_to_hex_str(T_OUT::from(result)),
+                    words[3]
+                )
+            }
             // // sqrt
             // // rem
             // // eq, le, lt
