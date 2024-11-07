@@ -72,59 +72,54 @@ impl Mul for SoftFloat16 {
 
         // handle denormals and implicit bit
         let (exponent0, significand0) = if exponent0 == 0 {
-            (1, significand0)
-        } else {
-            (exponent0, significand0 | 0x400)
-        };
-
-        let (exponent1, significand1) = if exponent1 == 0 {
-            (1, significand1)
-        } else {
-            (exponent1, significand1 | 0x400)
-        };
-
-        let exponent = (exponent0 + exponent1) as i16 - 15;
-        assert!(exponent >= -15);
-        assert!(exponent <= 60);
-
-        let significand = (significand0 as u32) * (significand1 as u32);
-        assert!(significand < (1 << (12 + 10)));
-
-        // (try to) normalize
-        let (exponent, significand) = if significand & (1 << (11 + 10)) != 0 {
-            // decimal point too far right
-            let exponent = exponent + 1;
-            let sticky = (significand & 1 != 0) as u32;
-            let significand = (significand >> 1) | sticky;
-            (exponent, significand)
-        } else {
-            // decimal point too far left
-            let mut exponent = exponent;
-            let mut significand = significand;
-            while significand & (1 << (10 + 10)) == 0 && exponent > 1 {
+            // normalize
+            let mut exponent = 1_i16;
+            let mut significand = significand0;
+            while significand & (1 << 10) == 0 {
                 significand <<= 1;
                 exponent -= 1;
             }
             (exponent, significand)
+        } else {
+            (exponent0 as i16, significand0 | 0x400)
         };
 
-        if exponent >= 0x1F {
-            // overflow
-            return if sign == 0 {
-                POS_INFINITY
-            } else {
-                NEG_INFINITY
-            };
-        }
+        let (exponent1, significand1) = if exponent1 == 0 {
+            // normalize
+            let mut exponent = 1_i16;
+            let mut significand = significand1;
+            while significand & (1 << 10) == 0 {
+                significand <<= 1;
+                exponent -= 1;
+            }
+            (exponent, significand)
+        } else {
+            (exponent1 as i16, significand1 | 0x400)
+        };
+
+        let exponent = (exponent0 + exponent1) as i16 - 15;
+
+        let significand = (significand0 as u32) * (significand1 as u32);
+        assert!(significand < (1 << (12 + 10)));
 
         // keep lowest three bits for guard, round, sticky bits
-        let sticky_bits = (1 << (7 + 1)) - 1;
+        let sticky_bits = (1 << (10 - 3 + 1)) - 1;
         let sticky = (significand & sticky_bits != 0) as u16;
-        let significand = ((significand >> 7) as u16) | sticky;
+        let significand = ((significand >> (10 - 3)) as u16) | sticky;
+
+        let (exponent, significand) = if significand & (1 << (11 + 3)) != 0 {
+            // realign decimal point
+            let significand = (significand >> 1) | sticky;
+            (exponent + 1, significand)
+        } else {
+            assert!((significand & (1 << (10 + 3))) != 0);
+            (exponent, significand)
+        };
 
         let (exponent, significand) = if exponent < -11 {
+            // TODO why does -11 work? why don't we need to worry about rounding bit?
             // underflow
-            return Self::from_bits(sign << 15);
+            return if sign == 0 { POS_ZERO } else { NEG_ZERO };
         } else if exponent <= 0 {
             // must convert to denormal number; make exponent representable by
             // shifting significand
@@ -133,6 +128,13 @@ impl Mul for SoftFloat16 {
             let sticky = (significand & sticky_bits != 0) as u16;
             let significand = (significand >> shift) | sticky;
             (1, significand)
+        } else if exponent >= 0x1F {
+            // overflow
+            return if sign == 0 {
+                POS_INFINITY
+            } else {
+                NEG_INFINITY
+            };
         } else {
             (exponent as u16, significand)
         };
@@ -176,6 +178,8 @@ mod tests {
             (1057, 14305),
             (15362, 31742),
             (16384, 30721),
+            (1, 17537),
+            (15362, 31742),
         ] {
             let x0 = SoftFloat16::from_bits(v0);
             let x1 = SoftFloat16::from_bits(v1);
