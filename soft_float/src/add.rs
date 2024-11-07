@@ -99,16 +99,7 @@ impl Add for SoftFloat16 {
             if significand & (1 << (11 + 3)) != 0 {
                 // realign decimal point
                 let significand = (significand >> 1) | sticky;
-                let exponent = exponent + 1;
-                if exponent >= 0x1F {
-                    // overflow
-                    return if sign == 0 {
-                        POS_INFINITY
-                    } else {
-                        NEG_INFINITY
-                    };
-                }
-                (sign, exponent, significand)
+                (sign, exponent + 1, significand)
             } else {
                 (sign, exponent, significand)
             }
@@ -123,13 +114,13 @@ impl Add for SoftFloat16 {
             assert!(significand < (1 << (11 + 3)));
 
             if significand & (1 << (10 + 3)) == 0 && exponent > 1 {
-                // (try) to realign decimal point
+                // (try to) realign decimal point
                 significand <<= 1;
                 exponent -= 1;
             }
 
             if significand & (1 << (10 + 3)) == 0 && exponent > 1 {
-                // continue to try to realign decimal point if several leading
+                // continue to (try to) realign decimal point if several leading
                 // digits have been canceled; this can only happen for two
                 // normal numbers; cancellation occurs -> implicit bits need to
                 // be lined up -> shift must be 0 or 1 -> at most the guard bit
@@ -145,6 +136,16 @@ impl Add for SoftFloat16 {
             }
 
             (sign, exponent, significand)
+        };
+
+        assert!(exponent > 0);
+        if exponent >= 0x1F {
+            // overflow
+            return if sign == 0 {
+                POS_INFINITY
+            } else {
+                NEG_INFINITY
+            };
         };
 
         // rounding (to even)
