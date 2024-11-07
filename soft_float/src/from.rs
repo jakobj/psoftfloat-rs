@@ -12,8 +12,9 @@ impl From<f32> for SoftFloat16 {
         let unbiased_exponent = ((bits & 0x7f800000) >> 23) as i32 - 127;
         let original_significand = bits & 0x7fffff; // without implicit bit
 
-        if unbiased_exponent < -24 {
-            // smallest representable number in f16 is 2^{-24}
+        if unbiased_exponent < -25 {
+            // smallest representable number in f16 is 2^{-24} and if unbiased
+            // exponent is < -25 we can be sure rounding bit is zero
             if sign == 0 {
                 POS_ZERO
             } else {
@@ -121,6 +122,20 @@ mod tests {
             let x = SoftFloat16::from_bits(v);
             let y = f32::from(x);
             assert_eq!(y.to_bits(), expected)
+        }
+    }
+
+    #[test]
+    fn test_softfloat16_from_f32() {
+        for (v, expected) in [
+            (0x7FFF0007, 0x7e00),
+            (0x337fc010, 0x1),
+            (0x331ffffc, 0x1),
+            (0x337FFFC4, 0x1),
+        ] {
+            let x = f32::from_bits(v);
+            let y = SoftFloat16::from(x);
+            assert_eq!(SoftFloat16::to_bits(y), expected)
         }
     }
 }
