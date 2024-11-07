@@ -169,6 +169,7 @@ impl Div for SoftFloat16 {
             exponent
         };
 
+        // cut off implicit bit and allow overflow into exponent
         Self::from_bits(sign << 15 | (exponent << 10 | significand & 0x3FF) + rnd)
     }
 }

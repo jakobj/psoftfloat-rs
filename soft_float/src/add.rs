@@ -97,7 +97,7 @@ impl Add for SoftFloat16 {
             assert!(significand < (1 << (12 + 3)));
 
             if significand & (1 << (11 + 3)) != 0 {
-                // need to realign decimal point
+                // realign decimal point
                 let significand = (significand >> 1) | sticky;
                 let exponent = exponent + 1;
                 if exponent >= 0x1F {
@@ -123,17 +123,17 @@ impl Add for SoftFloat16 {
             assert!(significand < (1 << (11 + 3)));
 
             if significand & (1 << (10 + 3)) == 0 && exponent > 1 {
-                // need to realign decimal point
+                // (try) to realign decimal point
                 significand <<= 1;
                 exponent -= 1;
             }
 
             if significand & (1 << (10 + 3)) == 0 && exponent > 1 {
-                // continue to realign decimal point if several leading digits
-                // have been canceled; this can only happen for two normal
-                // numbers; cancellation occurs -> implicit bits need to be
-                // lined up -> shift must be 0 or 1 -> at most the guard bit is
-                // nonzero, so we don't need to worry about round and sticky
+                // continue to try to realign decimal point if several leading
+                // digits have been canceled; this can only happen for two
+                // normal numbers; cancellation occurs -> implicit bits need to
+                // be lined up -> shift must be 0 or 1 -> at most the guard bit
+                // is nonzero, so we don't need to worry about round and sticky
                 // bits
                 assert!(SoftFloat16::exponent(self) != 0);
                 assert!(SoftFloat16::exponent(other) != 0);
@@ -166,6 +166,7 @@ impl Add for SoftFloat16 {
             exponent
         };
 
+        // cut off implicit bit and allow into exponent
         Self::from_bits(sign << 15 | (exponent << 10 | significand & 0x3FF) + rnd)
     }
 }
