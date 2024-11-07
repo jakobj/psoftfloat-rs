@@ -17,9 +17,9 @@ all: testfloat
 testfloat:
 	RUSTFLAGS=-Awarnings cd ../soft_float/ && cargo build --release --bin testfloat
 	@echo -e "${BOLD}Testing SoftFloat16${NO_COLOR}"
-	@$(TESTFLOAT_GEN) f32_to_f16 | $(SOFTFLOAT_TESTFLOAT) f32_to_softfloat16 | $(TESTFLOAT_VER) f32_to_f16 | ${COLOR_NO_ERRORS}
-	@$(TESTFLOAT_GEN) f16_to_f32 | $(SOFTFLOAT_TESTFLOAT) softfloat16_to_f32 | $(TESTFLOAT_VER) f16_to_f32 | ${COLOR_NO_ERRORS}
-	@$(TESTFLOAT_GEN) f16_add | $(SOFTFLOAT_TESTFLOAT) softfloat16_add | $(TESTFLOAT_VER) f16_add | ${COLOR_NO_ERRORS}
-	@$(TESTFLOAT_GEN) f16_sub | $(SOFTFLOAT_TESTFLOAT) softfloat16_sub | $(TESTFLOAT_VER) f16_sub | ${COLOR_NO_ERRORS}
-	@$(TESTFLOAT_GEN) f16_mul | $(SOFTFLOAT_TESTFLOAT) softfloat16_mul | $(TESTFLOAT_VER) f16_mul | ${COLOR_NO_ERRORS}
-	@$(TESTFLOAT_GEN) f16_div | $(SOFTFLOAT_TESTFLOAT) softfloat16_div # | $(TESTFLOAT_VER) f16_div | ${COLOR_NO_ERRORS}
+	@$(TESTFLOAT_GEN) f32_to_f16 -level 2 | $(SOFTFLOAT_TESTFLOAT) f32_to_softfloat16 | $(TESTFLOAT_VER) f32_to_f16 | ${COLOR_NO_ERRORS}
+	@$(TESTFLOAT_GEN) f16_to_f32 -level 2 | $(SOFTFLOAT_TESTFLOAT) softfloat16_to_f32 | $(TESTFLOAT_VER) f16_to_f32 | ${COLOR_NO_ERRORS}
+	@$(TESTFLOAT_GEN) f16_add -level 2 | $(SOFTFLOAT_TESTFLOAT) softfloat16_add | $(TESTFLOAT_VER) f16_add | ${COLOR_NO_ERRORS}
+	@$(TESTFLOAT_GEN) f16_sub -level 2 | $(SOFTFLOAT_TESTFLOAT) softfloat16_sub | $(TESTFLOAT_VER) f16_sub | ${COLOR_NO_ERRORS}
+	@$(TESTFLOAT_GEN) f16_mul -level 2 | $(SOFTFLOAT_TESTFLOAT) softfloat16_mul | $(TESTFLOAT_VER) f16_mul | ${COLOR_NO_ERRORS}
+	@$(TESTFLOAT_GEN) f16_div -level 2 | $(SOFTFLOAT_TESTFLOAT) softfloat16_div | $(TESTFLOAT_VER) f16_div | ${COLOR_NO_ERRORS}
