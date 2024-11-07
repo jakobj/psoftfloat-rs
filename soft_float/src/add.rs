@@ -10,10 +10,7 @@ impl Add for SoftFloat16 {
         match (self, other) {
             (NAN, _) => return NAN,
             (_, NAN) => return NAN,
-            (POS_ZERO, POS_ZERO) => return POS_ZERO,
             (POS_ZERO, NEG_ZERO) => return POS_ZERO,
-            (NEG_ZERO, POS_ZERO) => return POS_ZERO,
-            (NEG_ZERO, NEG_ZERO) => return NEG_ZERO,
             (POS_ZERO, _) => return other,
             (NEG_ZERO, _) => return other,
             (_, POS_ZERO) => return self,
