@@ -3,8 +3,6 @@ use std::ops::Div;
 use crate::soft_float16::{NAN, NEG_INFINITY, NEG_ZERO, POS_INFINITY, POS_ZERO};
 use crate::SoftFloat16;
 
-const VERBOSE: bool = false;
-
 impl Div for SoftFloat16 {
     type Output = Self;
 
@@ -37,21 +35,40 @@ impl Div for SoftFloat16 {
         match (self, other) {
             (POS_ZERO, _) => return if sign1 == 0 { POS_ZERO } else { NEG_ZERO },
             (NEG_ZERO, _) => return if sign1 == 0 { NEG_ZERO } else { POS_ZERO },
-            (_, POS_ZERO) => return if sign0 == 0 { POS_INFINITY } else { NEG_INFINITY },
-            (_, NEG_ZERO) => return if sign0 == 0 { NEG_INFINITY } else { POS_INFINITY },
-            (POS_INFINITY, _) => return if sign1 == 0 { POS_INFINITY } else { NEG_INFINITY },
-            (NEG_INFINITY, _) => return if sign1 == 0 { NEG_INFINITY } else { POS_INFINITY },
+            (_, POS_ZERO) => {
+                return if sign0 == 0 {
+                    POS_INFINITY
+                } else {
+                    NEG_INFINITY
+                }
+            }
+            (_, NEG_ZERO) => {
+                return if sign0 == 0 {
+                    NEG_INFINITY
+                } else {
+                    POS_INFINITY
+                }
+            }
+            (POS_INFINITY, _) => {
+                return if sign1 == 0 {
+                    POS_INFINITY
+                } else {
+                    NEG_INFINITY
+                }
+            }
+            (NEG_INFINITY, _) => {
+                return if sign1 == 0 {
+                    NEG_INFINITY
+                } else {
+                    POS_INFINITY
+                }
+            }
             (_, POS_INFINITY) => return if sign0 == 0 { POS_ZERO } else { NEG_ZERO },
             (_, NEG_INFINITY) => return if sign0 == 0 { NEG_ZERO } else { POS_ZERO },
             _ => (),
         }
 
         let sign = sign0 ^ sign1;
-
-        if VERBOSE {
-            println!("{:03}|{:024b} <- before normalize 0", exponent0, significand0);
-            println!("{:03}|{:024b} <- before normalize 1", exponent1, significand1);
-        }
 
         // handle denormals and implicit bit
         let (exponent0, significand0) = if exponent0 == 0 {
@@ -79,10 +96,6 @@ impl Div for SoftFloat16 {
         } else {
             (exponent1 as i16, significand1 | 0x400)
         };
-        if VERBOSE {
-            println!("{:03}|{:024b} <- after normalize 0", exponent0, significand0);
-            println!("{:03}|{:024b} <- after normalize 1", exponent1, significand1);
-        }
 
         let mut exponent = (exponent0 - exponent1) + 15;
 
@@ -98,6 +111,7 @@ impl Div for SoftFloat16 {
         };
 
         // generate (11 bits + 3 GRS bits) quotient one bit at a time using long division
+        // TODO still looks a bit funky; e.g., lowest bit of r will always be zero!?
         let mut r = 0;
         for _ in 0..(10 + 3) {
             if x >= y {
@@ -107,43 +121,34 @@ impl Div for SoftFloat16 {
             r <<= 1;
             x <<= 1;
         }
-        if VERBOSE {
-            println!("{:03}|{:024b} <- after div", exponent, r);
-        }
+        assert!((r & 1) == 0);
 
         let sticky = (x != 0) as u16;
         let significand = r | sticky;
         assert!(significand < (0x800 << 3));
-        assert!(significand >= (0x100 << 3));
         assert!((significand & (0x400 << 3)) != 0);
 
-        if VERBOSE {
-            println!("{:03}|{:024b} <- with sticky", exponent, significand);
-        }
-
         let (exponent, significand) = if exponent < -11 {
+            // TODO why does -11 work? why don't we need to worry about rounding bit?
             // underflow
             return Self::from_bits(sign << 15);
         } else if exponent <= 0 {
             // must convert to denormal number; make exponent representable by
             // shifting significand
             let shift = 1 - exponent;
-            if VERBOSE {
-                println!("{} {}", shift, sticky);
-            }
             let sticky_bits = (1 << (shift + 1)) - 1;
             let sticky = (significand & sticky_bits != 0) as u16;
             let significand = (significand >> shift) | sticky;
             (1, significand)
         } else if exponent >= 0x1F {
-            return if sign == 0 { POS_INFINITY } else { NEG_INFINITY };
+            return if sign == 0 {
+                POS_INFINITY
+            } else {
+                NEG_INFINITY
+            };
         } else {
             (exponent as u16, significand)
         };
-
-        if VERBOSE {
-            println!("{:03}|{:024b} <- after shift", exponent, significand);
-        }
 
         // rounding (to even)
         let grs = significand & 0x7;
