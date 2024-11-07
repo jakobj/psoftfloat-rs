@@ -192,14 +192,13 @@ mod tests {
             (0x7c00, 0x0),
             (0x7c00, 0x7c00),
             (1, 0),
+            (0x87ff, 0xe850),
         ] {
             let x0 = SoftFloat16::from_bits(v0);
             let x1 = SoftFloat16::from_bits(v1);
-            let y_sf = x0 / x1;
+            let y = x0 / x1;
             let y_f = SoftFloat16::from(f32::from(x0) / f32::from(x1));
-            println!("{:017b} <- sf", SoftFloat16::to_bits(y_sf));
-            println!("{:017b} <-  f", SoftFloat16::to_bits(y_f));
-            assert_eq!(SoftFloat16::to_bits(y_sf), SoftFloat16::to_bits(y_f));
+            assert_eq!(SoftFloat16::to_bits(y), SoftFloat16::to_bits(y_f));
         }
     }
 
@@ -208,16 +207,16 @@ mod tests {
     fn test_all_div() {
         for i in 0..u16::MAX {
             for j in 0..u16::MAX {
-                let x0_sf = SoftFloat16::from_bits(i);
-                let x1_sf = SoftFloat16::from_bits(j);
-                let y_sf = x0_sf / x1_sf;
-                let y_f = SoftFloat16::from(f32::from(x0_sf) / f32::from(x1_sf));
-                if y_sf == NAN || y_f == NAN {
-                    assert!(y_sf == NAN, "{:?}", (i, j));
+                let x0 = SoftFloat16::from_bits(i);
+                let x1 = SoftFloat16::from_bits(j);
+                let y = x0 / x1;
+                let y_f = SoftFloat16::from(f32::from(x0) / f32::from(x1));
+                if y == NAN || y_f == NAN {
+                    assert!(y == NAN, "{:?}", (i, j));
                     assert!(y_f == NAN, "{:?}", (i, j));
                 } else {
                     assert_eq!(
-                        SoftFloat16::to_bits(y_sf),
+                        SoftFloat16::to_bits(y),
                         SoftFloat16::to_bits(y_f),
                         "{:?}",
                         (i, j)

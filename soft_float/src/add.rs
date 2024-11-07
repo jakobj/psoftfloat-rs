@@ -163,28 +163,28 @@ mod tests {
 
     #[test]
     fn test_add() {
-        for ((v0, v1), expected) in [
-            ((4143, 5311), 5846),
-            // ((0x77, 0x15), 0x8c),
-            // ((0x14bf, 0x142f), 0x1877),
-            // ((0x87FF, 0xE850), 0xE850),
-            // ((0x0000, 0x857F), 0x857F),
-            // ((0x74FB, 0xE879), 0x746C),
-            // ((0x7978, 0x0001), 0x7978),
-            // ((0x0000, 0x0000), 0x0000),
-            // ((0xC19A, 0xCFEB), 0xD04F),
-            // ((0x0200, 0x0200), 0x0400),
-            // ((0x0301, 0x0101), 0x0402),
-            // ((30721, 30721), 31744),
-            // ((1025, 34816), 33791),
-            // ((32768, 0), 0),
-            // ((32769, 1), 0),
+        for (v0, v1) in [
+            (4143, 5311),
+            (0x77, 0x15),
+            (0x14bf, 0x142f),
+            (0x87FF, 0xE850),
+            (0x0000, 0x857F),
+            (0x74FB, 0xE879),
+            (0x7978, 0x0001),
+            (0x0000, 0x0000),
+            (0xC19A, 0xCFEB),
+            (0x0200, 0x0200),
+            (0x0301, 0x0101),
+            (30721, 30721),
+            (1025, 34816),
+            (32768, 0),
+            (32769, 1),
         ] {
             let x0 = SoftFloat16::from_bits(v0);
             let x1 = SoftFloat16::from_bits(v1);
             let y = x0 + x1;
-            println!("{:017b}", SoftFloat16::to_bits(y));
-            assert_eq!(SoftFloat16::to_bits(y), expected);
+            let y_f = SoftFloat16::from(f32::from(x0) + f32::from(x1));
+            assert_eq!(SoftFloat16::to_bits(y), SoftFloat16::to_bits(y_f));
         }
     }
 
@@ -193,16 +193,16 @@ mod tests {
     fn test_all_add() {
         for i in 0..u16::MAX {
             for j in 0..u16::MAX {
-                let x0_sf = SoftFloat16::from_bits(i);
-                let x1_sf = SoftFloat16::from_bits(j);
-                let y_sf = x0_sf + x1_sf;
-                let y_f = SoftFloat16::from(f32::from(x0_sf) + f32::from(x1_sf));
-                if y_sf == NAN || y_f == NAN {
-                    assert!(y_sf == NAN);
-                    assert!(y_f == NAN);
+                let x0 = SoftFloat16::from_bits(i);
+                let x1 = SoftFloat16::from_bits(j);
+                let y = x0 + x1;
+                let y_f = SoftFloat16::from(f32::from(x0) + f32::from(x1));
+                if y == NAN || y_f == NAN {
+                    assert!(y == NAN, "{:?}", (i, j));
+                    assert!(y_f == NAN, "{:?}", (i, j));
                 } else {
                     assert_eq!(
-                        SoftFloat16::to_bits(y_sf),
+                        SoftFloat16::to_bits(y),
                         SoftFloat16::to_bits(y_f),
                         "{:?}",
                         (i, j)

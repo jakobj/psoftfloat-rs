@@ -166,22 +166,21 @@ mod tests {
 
     #[test]
     fn test_mul() {
-        for ((v0, v1), expected) in [
-            ((0x200, 0x200), 0x0),
-            ((0x3c04, 0x3c04), 0x3C08),
-            ((513, 5117), 1),
-            ((1025, 4095), 1),
-            ((1025, 16383), 2048),
-            ((1057, 14305), 521),
-            ((15362, 31742), 31744),
-            ((16384, 30721), 31744),
+        for (v0, v1) in [
+            (0x200, 0x200),
+            (0x3c04, 0x3c04),
+            (513, 5117),
+            (1025, 4095),
+            (1025, 16383),
+            (1057, 14305),
+            (15362, 31742),
+            (16384, 30721),
         ] {
             let x0 = SoftFloat16::from_bits(v0);
             let x1 = SoftFloat16::from_bits(v1);
-
             let y = x0 * x1;
-
-            assert_eq!(SoftFloat16::to_bits(y), expected);
+            let y_f = SoftFloat16::from(f32::from(x0) * f32::from(x1));
+            assert_eq!(SoftFloat16::to_bits(y), SoftFloat16::to_bits(y_f));
         }
     }
 
@@ -189,17 +188,14 @@ mod tests {
     #[ignore]
     fn test_all_mul() {
         for i in 0..u16::MAX {
-            if i % 1000 == 0 {
-                println!("{}", i);
-            }
             for j in 0..u16::MAX {
                 let x0_sf = SoftFloat16::from_bits(i);
                 let x1_sf = SoftFloat16::from_bits(j);
                 let y_sf = x0_sf * x1_sf;
                 let y_f = SoftFloat16::from(f32::from(x0_sf) * f32::from(x1_sf));
                 if y_sf == NAN || y_f == NAN {
-                    assert!(y_sf == NAN);
-                    assert!(y_f == NAN);
+                    assert!(y_sf == NAN, "{:?}", (i, j));
+                    assert!(y_f == NAN, "{:?}", (i, j));
                 } else {
                     assert_eq!(
                         SoftFloat16::to_bits(y_sf),
