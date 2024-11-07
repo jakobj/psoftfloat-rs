@@ -76,22 +76,20 @@ impl Add for SoftFloat16 {
                 )
             };
 
-        let shift = exponent0 - exponent1;
-
-        // if shifting operation would throw out all bits (even beyond guard,
-        // round, sticky) it's like adding zero, so we can just return early
-        if shift >= 13 {
-            return Self::from_bits(sign0 << 15 | exponent0 << 10 | significand0 & 0x3FF);
-        }
+        let shift = (exponent0 - exponent1) as u16;
 
         // insert guard, round, sticky bits
         let significand0 = significand0 << 3;
         let significand1 = significand1 << 3;
         let sticky_bits = (1 << (shift + 1)) - 1;
-        let sticky = (significand1 & sticky_bits != 0) as u16;
+        let sticky = ((significand1 & sticky_bits) != 0) as u16;
 
         // align decimal point of second number
-        let significand1 = (significand1 >> shift) | sticky;
+        let significand1 = if shift < 16 {
+            (significand1 >> shift) | sticky
+        } else {
+            0
+        };
 
         // if signs are equal add significands, otherwise subtract
         let (sign, exponent, significand) = if sign0 == sign1 {
@@ -123,11 +121,29 @@ impl Add for SoftFloat16 {
                 (sign1, exponent0, significand1 - significand0)
             };
             assert!(significand < (1 << (11 + 3)));
-            while significand & (1 << (10 + 3)) == 0 && exponent > 1 {
-                // realign decimal point
+
+            if significand & (1 << (10 + 3)) == 0 && exponent > 1 {
+                // need to realign decimal point
                 significand <<= 1;
                 exponent -= 1;
             }
+
+            if significand & (1 << (10 + 3)) == 0 && exponent > 1 {
+                // continue to realign decimal point if several leading digits
+                // have been canceled; this can only happen for two normal
+                // numbers; cancellation occurs -> implicit bits need to be
+                // lined up -> shift must be 0 or 1 -> at most the guard bit is
+                // nonzero, so we don't need to worry about round and sticky
+                // bits
+                assert!(SoftFloat16::exponent(self) != 0);
+                assert!(SoftFloat16::exponent(other) != 0);
+                assert!(shift <= 1);
+                while significand & (1 << (10 + 3)) == 0 && exponent > 1 {
+                    significand <<= 1;
+                    exponent -= 1;
+                }
+            }
+
             (sign, exponent, significand)
         };
 
