@@ -23,3 +23,4 @@ testfloat:
 	@$(TESTFLOAT_GEN) f16_sub -level 2 | $(SOFTFLOAT_TESTFLOAT) softfloat16_sub | $(TESTFLOAT_VER) f16_sub | ${COLOR_NO_ERRORS}
 	@$(TESTFLOAT_GEN) f16_mul -level 2 | $(SOFTFLOAT_TESTFLOAT) softfloat16_mul | $(TESTFLOAT_VER) f16_mul | ${COLOR_NO_ERRORS}
 	@$(TESTFLOAT_GEN) f16_div -level 2 | $(SOFTFLOAT_TESTFLOAT) softfloat16_div | $(TESTFLOAT_VER) f16_div | ${COLOR_NO_ERRORS}
+	@$(TESTFLOAT_GEN) f16_roundToInt -level 2 | $(SOFTFLOAT_TESTFLOAT) softfloat16_round | $(TESTFLOAT_VER) f16_roundToInt | ${COLOR_NO_ERRORS}

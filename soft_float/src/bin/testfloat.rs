@@ -5,6 +5,7 @@ use std::{
     ops::{Add, Div, Mul, Sub},
 };
 
+use soft_float::RoundTiesEven;
 use soft_float::SoftFloat16;
 
 fn main() {
@@ -65,7 +66,8 @@ fn testfloat<
         + Mul<Output = T_IN>
         + Div<Output = T_IN>
         + Debug
-        + Copy,
+        + Copy
+        + RoundTiesEven,
     T_OUT: ConvertHexStr + From<T_IN> + Debug + Copy,
 >(
     op: &str,
@@ -137,6 +139,16 @@ fn testfloat<
             // // sqrt
             // // rem
             // // eq, le, lt
+            "round" => {
+                let value = T_IN::hex_str_to_float(words[0]);
+                let result = T_IN::round_ties_even(value);
+                format!(
+                    "{} {} {}",
+                    words[0],
+                    T_OUT::float_to_hex_str(T_OUT::from(result)),
+                    words[2]
+                )
+            }
             "to" => {
                 let result = T_IN::hex_str_to_float(words[0]);
                 format!(

@@ -3,7 +3,9 @@ mod div;
 mod from;
 mod mul;
 mod neg;
+mod round;
 mod soft_float16;
 mod sub;
 
+pub use round::RoundTiesEven;
 pub use soft_float16::SoftFloat16;
