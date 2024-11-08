@@ -101,6 +101,7 @@ impl Mul for SoftFloat16 {
 
         let significand = (significand0 as u32) * (significand1 as u32);
         assert!(significand < (1 << (12 + 10)));
+        assert!((significand & (1 << (11 + 10))) != 0 | (significand & (1 << (10 + 10))));
 
         // keep lowest three bits for guard, round, sticky bits
         let sticky_bits = (1 << (10 - 3 + 1)) - 1;

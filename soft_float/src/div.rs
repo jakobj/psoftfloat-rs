@@ -97,41 +97,38 @@ impl Div for SoftFloat16 {
             (exponent1 as i16, significand1 | 0x400)
         };
 
-        let mut exponent = (exponent0 - exponent1) + 15;
+        let exponent = (exponent0 - exponent1) + 15;
 
+        // generate quotient (11 bits + 3 GRS bits) one bit at a time using long division
         let mut x = significand0;
         let y = significand1;
-
-        // we make sure that dividend is always larger than the divisor s/t that
-        // we are certain to obtain a normalized number (a 1 followed by 10
-        // decimal places)
-        if x < y {
-            x <<= 1;
-            exponent -= 1;
-        };
-
-        // generate (11 bits + 3 GRS bits) quotient one bit at a time using long division
-        // TODO still looks a bit funky; e.g., lowest bit of r will always be zero!?
         let mut r = 0;
-        for _ in 0..(10 + 3) {
+        for _ in 0..(11 + 3) {
+            r <<= 1;
             if x >= y {
                 r = r | 1;
                 x = x - y;
             }
-            r <<= 1;
             x <<= 1;
         }
-        assert!((r & 1) == 0);
 
         let sticky = (x != 0) as u16;
         let significand = r | sticky;
-        assert!(significand < (0x800 << 3));
-        assert!((significand & (0x400 << 3)) != 0);
+        assert!(significand < (1 << (11 + 3)));
+        assert!((significand & (1 << (10 + 3))) != 0 | (significand & (1 << (9 + 3))));
+
+        let (exponent, significand) = if significand & (1 << (10 + 3)) == 0 {
+            // realign decimal point
+            assert!(significand & (1 << (9 + 3)) != 0);
+            (exponent - 1, significand << 1)
+        } else {
+            (exponent, significand)
+        };
 
         let (exponent, significand) = if exponent < -11 {
             // TODO why does -11 work? why don't we need to worry about rounding bit?
             // underflow
-            return Self::from_bits(sign << 15);
+            return if sign == 0 { POS_ZERO } else { NEG_ZERO };
         } else if exponent <= 0 {
             // must convert to denormal number; make exponent representable by
             // shifting significand
@@ -141,6 +138,7 @@ impl Div for SoftFloat16 {
             let significand = (significand >> shift) | sticky;
             (1, significand)
         } else if exponent >= 0x1F {
+            // overflow
             return if sign == 0 {
                 POS_INFINITY
             } else {
