@@ -200,7 +200,19 @@ mod tests {
             let x1 = SoftFloat16::from_bits(v1);
             let y = x0 + x1;
             let y_f = SoftFloat16::from(f32::from(x0) + f32::from(x1));
-            assert_eq!(SoftFloat16::to_bits(y), SoftFloat16::to_bits(y_f));
+            if y == NAN || y_f == NAN {
+                assert!(y == NAN, "{:?}", (v0, v1));
+                assert!(y_f == NAN, "{:?}", (v0, v1));
+            } else {
+                assert_eq!(
+                    SoftFloat16::to_bits(y),
+                    SoftFloat16::to_bits(y_f),
+                    "\n{:?}\n  {:016b}\n  {:016b}",
+                    (v0, v1),
+                    SoftFloat16::to_bits(y),
+                    SoftFloat16::to_bits(y_f),
+                );
+            }
         }
     }
 
