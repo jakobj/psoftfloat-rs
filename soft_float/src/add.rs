@@ -81,7 +81,7 @@ impl Add for SoftFloat16 {
         // insert guard, round, sticky bits
         let significand0 = significand0 << 3;
         let significand1 = significand1 << 3;
-        let sticky_bits = (1 << (shift + 1)) - 1;
+        let sticky_bits = (1 << shift) - 1;
         let sticky = ((significand1 & sticky_bits) != 0) as u16;
 
         // align decimal point of second number
@@ -98,6 +98,7 @@ impl Add for SoftFloat16 {
 
             if significand & (1 << (11 + 3)) != 0 {
                 // realign decimal point
+                let sticky = (significand & 1) | sticky;
                 let significand = (significand >> 1) | sticky;
                 (sign, exponent + 1, significand)
             } else {

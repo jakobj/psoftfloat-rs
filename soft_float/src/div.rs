@@ -133,7 +133,7 @@ impl Div for SoftFloat16 {
             // must convert to denormal number; make exponent representable by
             // shifting significand
             let shift = 1 - exponent;
-            let sticky_bits = (1 << (shift + 1)) - 1;
+            let sticky_bits = (1 << shift) - 1;
             let sticky = (significand & sticky_bits != 0) as u16;
             let significand = (significand >> shift) | sticky;
             (1, significand)

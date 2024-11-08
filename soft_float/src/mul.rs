@@ -104,12 +104,13 @@ impl Mul for SoftFloat16 {
         assert!((significand & (1 << (11 + 10))) != 0 | (significand & (1 << (10 + 10))));
 
         // keep lowest three bits for guard, round, sticky bits
-        let sticky_bits = (1 << (10 - 3 + 1)) - 1;
+        let sticky_bits = (1 << (10 - 3)) - 1;
         let sticky = (significand & sticky_bits != 0) as u16;
         let significand = ((significand >> (10 - 3)) as u16) | sticky;
 
         let (exponent, significand) = if significand & (1 << (11 + 3)) != 0 {
             // realign decimal point
+            let sticky = (significand & 1) | sticky;
             let significand = (significand >> 1) | sticky;
             (exponent + 1, significand)
         } else {
@@ -125,7 +126,7 @@ impl Mul for SoftFloat16 {
             // must convert to denormal number; make exponent representable by
             // shifting significand
             let shift = 1 - exponent;
-            let sticky_bits = (1 << (shift + 1)) - 1;
+            let sticky_bits = (1 << shift) - 1;
             let sticky = (significand & sticky_bits != 0) as u16;
             let significand = (significand >> shift) | sticky;
             (1, significand)
