@@ -39,7 +39,7 @@ impl SoftFloat16 {
 
 impl fmt::Display for SoftFloat16 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        todo!();
+        write!(f, "{}", f32::from(*self))
         // if self.exponent == 0 {
         //     if self.significand == 0 {
         //         // zero
