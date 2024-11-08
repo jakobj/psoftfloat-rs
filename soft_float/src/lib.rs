@@ -6,6 +6,8 @@ mod neg;
 mod round;
 mod soft_float16;
 mod sub;
+mod trunc;
 
 pub use round::RoundTiesEven;
 pub use soft_float16::SoftFloat16;
+pub use trunc::Trunc;
