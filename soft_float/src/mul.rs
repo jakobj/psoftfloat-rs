@@ -117,9 +117,9 @@ impl Mul for SoftFloat16 {
             (exponent, significand)
         };
 
-        let (exponent, significand) = if exponent < -11 {
-            // TODO why does -11 work? why don't we need to worry about rounding bit?
-            // underflow
+        let (exponent, significand) = if exponent <= -11 {
+            // underflow, since shift would be >= 12, i.e., all bits and guard
+            // bit would be zero; will always be rounded to zero
             return if sign == 0 { POS_ZERO } else { NEG_ZERO };
         } else if exponent <= 0 {
             // must convert to denormal number; make exponent representable by
