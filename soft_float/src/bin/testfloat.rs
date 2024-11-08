@@ -2,7 +2,7 @@ use std::{
     env,
     fmt::Debug,
     io::{self, BufRead},
-    ops::{Add, Div, Mul, Sub},
+    ops::{Add, Div, Mul, Rem, Sub},
 };
 
 use soft_float::RoundTiesEven;
@@ -65,6 +65,7 @@ fn testfloat<
         + Sub<Output = T_IN>
         + Mul<Output = T_IN>
         + Div<Output = T_IN>
+        + Rem<Output = T_IN>
         + Debug
         + Copy
         + RoundTiesEven,
@@ -139,6 +140,20 @@ fn testfloat<
             // // sqrt
             // // rem
             // // eq, le, lt
+            "rem" => {
+                let (value0, value1) = (
+                    T_IN::hex_str_to_float(words[0]),
+                    T_IN::hex_str_to_float(words[1]),
+                );
+                let result = T_IN::rem(value0, value1);
+                format!(
+                    "{} {} {} {}",
+                    words[0],
+                    words[1],
+                    T_OUT::float_to_hex_str(T_OUT::from(result)),
+                    words[3]
+                )
+            }
             "round" => {
                 let value = T_IN::hex_str_to_float(words[0]);
                 let result = T_IN::round_ties_even(value);

@@ -3,6 +3,7 @@ mod div;
 mod from;
 mod mul;
 mod neg;
+mod rem;
 mod round;
 mod soft_float16;
 mod sub;
