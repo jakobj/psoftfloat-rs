@@ -1,3 +1,4 @@
+use std::cmp;
 use std::ops::Add;
 
 use crate::soft_float16::{NAN, NEG_INFINITY, NEG_ZERO, POS_INFINITY, POS_ZERO};
@@ -122,18 +123,25 @@ impl Add for SoftFloat16 {
 
             if significand & (1 << (10 + 3)) == 0 && exponent > 1 {
                 // continue to (try to) realign decimal point if several leading
-                // digits have been canceled; this can only happen for two
-                // normal numbers; cancellation occurs -> implicit bits need to
-                // be lined up -> shift must be 0 or 1 -> at most the guard bit
-                // is nonzero, so we don't need to worry about round and sticky
-                // bits
+                // digits have been canceled; this can only happen for
+                // - two normal numbers; cancellation occurs -> implicit bits
+                // need to be lined up -> shift must be 0 or 1 -> at most the
+                // guard bit is nonzero
+                // - two denormal numbers; have same exponent, so GRS bits are
+                // zero
+                // in both cases we don't need to worry about sticky bit being
+                // shifted back into significand
                 assert!(SoftFloat16::exponent(self) != 0);
                 assert!(SoftFloat16::exponent(other) != 0);
                 assert!(shift <= 1);
-                while significand & (1 << (10 + 3)) == 0 && exponent > 1 {
-                    significand <<= 1;
-                    exponent -= 1;
-                }
+
+                // (11 + 3)th bit should be one, with a 16bit significand, we
+                // thus want 2 leading zeros
+                let clz = SoftFloat16::clz(significand);
+                assert!(clz > 2);
+                let shift = cmp::min(exponent - 1, clz - 2);
+                significand <<= shift;
+                exponent -= shift;
             }
 
             (sign, exponent, significand)
