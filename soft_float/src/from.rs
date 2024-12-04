@@ -74,18 +74,21 @@ impl From<f32> for SoftFloat16 {
 
 impl From<SoftFloat16> for f32 {
     fn from(value: SoftFloat16) -> Self {
-        match value {
-            NAN => return f32::NAN,
-            POS_INFINITY => return f32::INFINITY,
-            NEG_INFINITY => return f32::NEG_INFINITY,
-            POS_ZERO => return 0.0_f32,
-            NEG_ZERO => return -0.0_f32,
-            _ => (),
-        };
-
         let sign = SoftFloat16::sign(value) as u32;
         let exponent = SoftFloat16::exponent(value) as u32;
         let significand = SoftFloat16::significand(value) as u32;
+
+        if exponent == 0x1F && significand != 0 {
+            return f32::NAN;
+        } else if exponent == 0x1F && significand == 0 {
+            return if sign == 0 {
+                f32::INFINITY
+            } else {
+                f32::NEG_INFINITY
+            };
+        } else if exponent == 0 && significand == 0 {
+            return if sign == 0 { 0.0_f32 } else { -0.0_f32 };
+        }
 
         // handle denormals and implicit bit
         let (exponent, significand) = if exponent == 0 {

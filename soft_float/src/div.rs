@@ -7,20 +7,6 @@ impl Div for SoftFloat16 {
     type Output = Self;
 
     fn div(self, other: Self) -> Self {
-        match (self, other) {
-            (NAN, _) => return NAN,
-            (_, NAN) => return NAN,
-            (POS_ZERO, POS_ZERO) => return NAN,
-            (POS_ZERO, NEG_ZERO) => return NAN,
-            (NEG_ZERO, POS_ZERO) => return NAN,
-            (NEG_ZERO, NEG_ZERO) => return NAN,
-            (POS_INFINITY, POS_INFINITY) => return NAN,
-            (POS_INFINITY, NEG_INFINITY) => return NAN,
-            (NEG_INFINITY, POS_INFINITY) => return NAN,
-            (NEG_INFINITY, NEG_INFINITY) => return NAN,
-            _ => (),
-        }
-
         let (sign0, exponent0, significand0) = (
             Self::sign(self),
             Self::exponent(self),
@@ -32,40 +18,45 @@ impl Div for SoftFloat16 {
             Self::significand(other),
         );
 
-        match (self, other) {
-            (POS_ZERO, _) => return if sign1 == 0 { POS_ZERO } else { NEG_ZERO },
-            (NEG_ZERO, _) => return if sign1 == 0 { NEG_ZERO } else { POS_ZERO },
-            (_, POS_ZERO) => {
-                return if sign0 == 0 {
-                    POS_INFINITY
-                } else {
-                    NEG_INFINITY
-                }
-            }
-            (_, NEG_ZERO) => {
-                return if sign0 == 0 {
-                    NEG_INFINITY
-                } else {
-                    POS_INFINITY
-                }
-            }
-            (POS_INFINITY, _) => {
-                return if sign1 == 0 {
-                    POS_INFINITY
-                } else {
-                    NEG_INFINITY
-                }
-            }
-            (NEG_INFINITY, _) => {
-                return if sign1 == 0 {
-                    NEG_INFINITY
-                } else {
-                    POS_INFINITY
-                }
-            }
-            (_, POS_INFINITY) => return if sign0 == 0 { POS_ZERO } else { NEG_ZERO },
-            (_, NEG_INFINITY) => return if sign0 == 0 { NEG_ZERO } else { POS_ZERO },
-            _ => (),
+        if (exponent0 == 0x1F && significand0 != 0) || (exponent1 == 0x1F && significand1 != 0) {
+            // NAN / _ or _ / NAN
+            return NAN;
+        } else if (exponent0 == 0 && significand0 == 0) && (exponent1 == 0 && significand1 == 0) {
+            // 0 / 0
+            return NAN;
+        } else if (exponent0 == 0x1F && significand0 == 0)
+            && (exponent1 == 0x1F && significand1 == 0)
+        {
+            // oo/oo
+            return NAN;
+        } else if exponent0 == 0 && significand0 == 0 {
+            // 0 / _
+            return if sign0 ^ sign1 == 0 {
+                POS_ZERO
+            } else {
+                NEG_ZERO
+            };
+        } else if exponent1 == 0 && significand1 == 0 {
+            // _ / 0
+            return if sign0 ^ sign1 == 0 {
+                POS_INFINITY
+            } else {
+                NEG_INFINITY
+            };
+        } else if exponent0 == 0x1F && significand0 == 0 {
+            // oo / _
+            return if sign0 ^ sign1 == 0 {
+                POS_INFINITY
+            } else {
+                NEG_INFINITY
+            };
+        } else if exponent1 == 0x1F && significand1 == 0 {
+            // _ / oo
+            return if sign0 ^ sign1 == 0 {
+                POS_ZERO
+            } else {
+                NEG_ZERO
+            };
         }
 
         let sign = sign0 ^ sign1;
@@ -75,6 +66,7 @@ impl Div for SoftFloat16 {
             // normalize
             let mut exponent = 1_i16;
             let mut significand = significand0;
+            assert!(significand != 0);
             while significand & (1 << 10) == 0 {
                 significand <<= 1;
                 exponent -= 1;
@@ -88,6 +80,7 @@ impl Div for SoftFloat16 {
             // normalize
             let mut exponent = 1_i16;
             let mut significand = significand1;
+            assert!(significand != 0);
             while significand & (1 << 10) == 0 {
                 significand <<= 1;
                 exponent -= 1;

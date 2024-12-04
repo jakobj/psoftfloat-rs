@@ -8,23 +8,6 @@ impl Add for SoftFloat16 {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        match (self, other) {
-            (NAN, _) => return NAN,
-            (_, NAN) => return NAN,
-            (POS_ZERO, NEG_ZERO) => return POS_ZERO,
-            (POS_ZERO, _) => return other,
-            (NEG_ZERO, _) => return other,
-            (_, POS_ZERO) => return self,
-            (_, NEG_ZERO) => return self,
-            (POS_INFINITY, NEG_INFINITY) => return NAN,
-            (NEG_INFINITY, POS_INFINITY) => return NAN,
-            (POS_INFINITY, _) => return POS_INFINITY,
-            (NEG_INFINITY, _) => return NEG_INFINITY,
-            (_, POS_INFINITY) => return POS_INFINITY,
-            (_, NEG_INFINITY) => return NEG_INFINITY,
-            _ => (),
-        };
-
         let (sign0, exponent0, significand0) = (
             Self::sign(self),
             Self::exponent(self),
@@ -35,6 +18,35 @@ impl Add for SoftFloat16 {
             Self::exponent(other),
             Self::significand(other),
         );
+
+        if (exponent0 == 0x1F && significand0 != 0) || (exponent1 == 0x1F && significand1 != 0) {
+            // NAN + _ or _ + NAN
+            return NAN;
+        } else if (exponent0 == 0 && significand0 == 0) & (exponent1 == 0 && significand1 == 0) {
+            // 0 + 0
+            return if sign0 & sign1 == 0 {
+                POS_ZERO
+            } else {
+                NEG_ZERO
+            };
+        } else if exponent0 == 0 && significand0 == 0 {
+            // 0 + _
+            return other;
+        } else if exponent1 == 0 && significand1 == 0 {
+            // _ + 0
+            return self;
+        } else if (exponent0 == 0x1F && significand0 == 0)
+            && (exponent1 == 0x1F && significand1 == 0)
+        {
+            // oo + oo
+            return if sign0 == sign1 { self } else { NAN };
+        } else if exponent0 == 0x1F && significand0 == 0 {
+            // oo + _
+            return self;
+        } else if exponent1 == 0x1F && significand1 == 0 {
+            // _ + oo
+            return other;
+        };
 
         // numbers only differ in sign, so result is POS_ZERO
         if sign0 != sign1 && exponent0 == exponent1 && significand0 == significand1 {
