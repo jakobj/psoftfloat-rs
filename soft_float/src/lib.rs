@@ -4,6 +4,7 @@ mod eq;
 mod from;
 mod mul;
 mod neg;
+mod ord;
 mod rem;
 mod round;
 mod soft_float16;
