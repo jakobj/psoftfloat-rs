@@ -91,6 +91,12 @@ impl Add for SoftFloat16 {
 
         let shift = (exponent0 - exponent1) as u16;
 
+        // if shifting operation would throw out all bits (even beyond guard,
+        // round, sticky) it's like adding zero, so we can just return early
+        if shift >= 13 {
+            return Self::from_bits(sign0 << 15 | exponent0 << 10 | significand0 & 0x3FF);
+        }
+
         // insert guard, round, sticky bits
         let significand0 = significand0 << 3;
         let significand1 = significand1 << 3;
