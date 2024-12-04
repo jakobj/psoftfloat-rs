@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug)]
 pub struct SoftFloat16(u16);
 
 pub const POS_INFINITY: SoftFloat16 = SoftFloat16(0x7c00);

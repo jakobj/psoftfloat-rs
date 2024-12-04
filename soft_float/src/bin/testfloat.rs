@@ -68,7 +68,8 @@ fn testfloat<
         + Rem<Output = T_IN>
         + Debug
         + Copy
-        + RoundTiesEven,
+        + RoundTiesEven
+        + PartialEq,
     T_OUT: ConvertHexStr + From<T_IN> + Debug + Copy,
 >(
     op: &str,
@@ -140,6 +141,20 @@ fn testfloat<
             // // sqrt
             // // rem
             // // eq, le, lt
+            "eq" => {
+                let (value0, value1) = (
+                    T_IN::hex_str_to_float(words[0]),
+                    T_IN::hex_str_to_float(words[1]),
+                );
+                let result = value0 == value1;
+                format!(
+                    "{} {} {} {}",
+                    words[0],
+                    words[1],
+                    if result { 1 } else { 0 },
+                    words[3]
+                )
+            }
             "rem" => {
                 let (value0, value1) = (
                     T_IN::hex_str_to_float(words[0]),

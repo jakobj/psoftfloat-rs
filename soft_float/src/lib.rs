@@ -1,5 +1,6 @@
 mod add;
 mod div;
+mod eq;
 mod from;
 mod mul;
 mod neg;
