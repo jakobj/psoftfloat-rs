@@ -28,3 +28,4 @@ testfloat:
 	@$(TESTFLOAT_GEN) f16_eq -level 2 | $(SOFTFLOAT_TESTFLOAT) softfloat16_eq | $(TESTFLOAT_VER) f16_eq | ${COLOR_NO_ERRORS}
 	@$(TESTFLOAT_GEN) f16_le -level 2 | $(SOFTFLOAT_TESTFLOAT) softfloat16_le | $(TESTFLOAT_VER) f16_le | ${COLOR_NO_ERRORS}
 	@$(TESTFLOAT_GEN) f16_lt -level 2 | $(SOFTFLOAT_TESTFLOAT) softfloat16_lt | $(TESTFLOAT_VER) f16_lt | ${COLOR_NO_ERRORS}
+	@$(TESTFLOAT_GEN) i32_to_f16 | $(SOFTFLOAT_TESTFLOAT) i32_to_softfloat16 | $(TESTFLOAT_VER) i32_to_f16 | ${COLOR_NO_ERRORS}

@@ -17,8 +17,9 @@ fn main() {
     let type_out = split.next().unwrap_or(type_in);
 
     match (type_in, type_out) {
-        ("softfloat16", "f32") => testfloat::<SoftFloat16, f32>(op),
+        ("i32", "softfloat16") => testfloat::<i32, SoftFloat16>(op),
         ("f32", "softfloat16") => testfloat::<f32, SoftFloat16>(op),
+        ("softfloat16", "f32") => testfloat::<SoftFloat16, f32>(op),
         ("softfloat16", "softfloat16") => testfloat::<SoftFloat16, SoftFloat16>(op),
         _ => todo!(),
     };
@@ -27,6 +28,16 @@ fn main() {
 trait ConvertHexStr {
     fn hex_str_to_float(s: &str) -> Self;
     fn float_to_hex_str(v: Self) -> String;
+}
+
+impl ConvertHexStr for i32 {
+    fn hex_str_to_float(s: &str) -> Self {
+        u32::from_str_radix(s, 16).expect("should be hex representation of i32") as i32
+    }
+
+    fn float_to_hex_str(v: Self) -> String {
+        todo!()
+    }
 }
 
 impl ConvertHexStr for f32 {

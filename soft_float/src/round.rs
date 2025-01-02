@@ -64,6 +64,12 @@ impl RoundTiesEven for f32 {
     }
 }
 
+impl RoundTiesEven for i32 {
+    fn round_ties_even(_v: Self) -> Self {
+        unreachable!();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::soft_float16::NAN;

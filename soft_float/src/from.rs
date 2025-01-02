@@ -111,9 +111,68 @@ impl From<SoftFloat16> for f32 {
     }
 }
 
+impl From<i32> for SoftFloat16 {
+    fn from(value: i32) -> Self {
+        let bits = value as u32;
+
+        let sign = (bits >> 31) as u16;
+        let significand = if sign == 0 {
+            value as u32
+        } else {
+            -value as u32
+        };
+
+        if significand == 0 {
+            return if sign == 0 { POS_ZERO } else { NEG_ZERO };
+        }
+
+        if significand >= (1 << 16) {
+            return if sign == 0 {
+                POS_INFINITY
+            } else {
+                NEG_INFINITY
+            };
+        }
+
+        let mut exponent = 30;
+        let mut significand = significand;
+        while significand & (1 << 15) == 0 {
+            significand <<= 1;
+            exponent -= 1;
+        }
+        let sticky = if significand & 0x7 == 0 { 0 } else { 1 };
+        let significand = significand >> 2 | sticky;
+
+        let grs = significand & 0x7;
+        let significand = (significand >> 3) as u16;
+        let lsb = significand & 1;
+        if grs < 0x4 || (grs == 0x4 && lsb == 0) {
+            Self::from_bits(sign << 15 | exponent << 10 | (significand & 0x3ff))
+        } else {
+            // allow significand to overflow into exponent
+            Self::from_bits(sign << 15 | (exponent << 10 | (significand & 0x3ff)) + 1)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_softfloat16_from_i32() {
+        for (x, expected) in [
+            (1, 0x3c00),
+            (2, 0x4000),
+            (64, 0x5400),
+            (65503, 0x7bff),
+            (65504, 0x7bff),
+            (65536, 0x7c00),
+        ] {
+            let y = SoftFloat16::from(x);
+            assert_eq!(SoftFloat16::to_bits(y), expected)
+        }
+    }
 
     #[test]
     fn test_f32_from_softfloat16() {
