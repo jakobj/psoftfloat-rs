@@ -1,6 +1,6 @@
 use crate::{
     soft_float16::{NAN, NEG_INFINITY, NEG_ZERO, POS_INFINITY, POS_ZERO},
-    SoftFloat16,
+    RoundTiesEven, SoftFloat16,
 };
 
 impl From<f32> for SoftFloat16 {
@@ -155,6 +155,45 @@ impl From<i32> for SoftFloat16 {
     }
 }
 
+impl From<SoftFloat16> for i32 {
+    fn from(value: SoftFloat16) -> Self {
+        let value = SoftFloat16::round_ties_even(value);
+
+        let (sign, exponent, significand) = (
+            SoftFloat16::sign(value),
+            SoftFloat16::exponent(value),
+            SoftFloat16::significand(value),
+        );
+
+        if exponent == 0x1F {
+            // Infinity and NAN returned as largest-magnitude negative integer
+            // http://www.jhauser.us/arithmetic/TestFloat-3/doc/TestFloat-general.html, sec 6.1
+            return 1 << 31;
+        }
+
+        let unbiased_exponent = (exponent as i16) - 15;
+
+        if unbiased_exponent < 0 {
+            return 0;
+        }
+
+        let shift = unbiased_exponent - 10;
+        let significand = (significand | 0x400) as i32;
+
+        let significand = if shift < 0 {
+            significand >> -shift
+        } else {
+            significand << shift
+        };
+
+        if sign == 0 {
+            significand
+        } else {
+            -significand
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -175,15 +214,18 @@ mod tests {
     }
 
     #[test]
-    fn test_f32_from_softfloat16() {
+    fn test_i32_from_softfloat16() {
         for (v, expected) in [
-            (0x97db, 0xbafb6000_u32),
-            (0xe850, 0xc50a0000_u32),
-            (0x1, 0x33800000),
+            (0x5894, 146),
+            (0x609d, 590),
+            (0x649d, 1181),
+            (0x709d, 9448),
+            (0x70E9, 0x2748),
+            (0xf09d, -9448),
         ] {
             let x = SoftFloat16::from_bits(v);
-            let y = f32::from(x);
-            assert_eq!(y.to_bits(), expected)
+            let y = i32::from(x);
+            assert_eq!(y, expected)
         }
     }
 
@@ -198,6 +240,19 @@ mod tests {
             let x = f32::from_bits(v);
             let y = SoftFloat16::from(x);
             assert_eq!(SoftFloat16::to_bits(y), expected)
+        }
+    }
+
+    #[test]
+    fn test_f32_from_softfloat16() {
+        for (v, expected) in [
+            (0x97db, 0xbafb6000_u32),
+            (0xe850, 0xc50a0000_u32),
+            (0x1, 0x33800000),
+        ] {
+            let x = SoftFloat16::from_bits(v);
+            let y = f32::from(x);
+            assert_eq!(y.to_bits(), expected)
         }
     }
 }

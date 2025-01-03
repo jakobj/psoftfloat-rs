@@ -18,6 +18,7 @@ fn main() {
 
     match (type_in, type_out) {
         ("i32", "softfloat16") => testfloat::<i32, SoftFloat16>(op),
+        ("softfloat16", "i32") => testfloat::<SoftFloat16, i32>(op),
         ("f32", "softfloat16") => testfloat::<f32, SoftFloat16>(op),
         ("softfloat16", "f32") => testfloat::<SoftFloat16, f32>(op),
         ("softfloat16", "softfloat16") => testfloat::<SoftFloat16, SoftFloat16>(op),
@@ -36,7 +37,7 @@ impl ConvertHexStr for i32 {
     }
 
     fn float_to_hex_str(v: Self) -> String {
-        todo!()
+        format!("{:08x}", v).to_uppercase()
     }
 }
 
@@ -220,11 +221,12 @@ fn testfloat<
                 )
             }
             "to" => {
-                let result = T_IN::hex_str_to_float(words[0]);
+                let value = T_IN::hex_str_to_float(words[0]);
+                let result = T_OUT::from(value);
                 format!(
                     "{} {} {}",
                     words[0],
-                    T_OUT::float_to_hex_str(T_OUT::from(result)),
+                    T_OUT::float_to_hex_str(result),
                     words[2]
                 )
             }
