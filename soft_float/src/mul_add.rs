@@ -1,3 +1,4 @@
+use crate::soft_float16::NAN;
 use crate::SoftFloat16;
 
 pub trait MulAdd {
@@ -7,33 +8,28 @@ pub trait MulAdd {
 impl MulAdd for SoftFloat16 {
     fn mul_add(v0: Self, v1: Self, v2: Self) -> Self {
         println!("----------------");
-        let (sign0, exponent0, significand0) = (
-            Self::sign(v0),
-            Self::exponent(v0),
-            Self::significand(v0),
-        );
-
-        let (sign1, exponent1, significand1) = (
-            Self::sign(v1),
-            Self::exponent(v1),
-            Self::significand(v1),
-        );
 
         // TODO handle special numbers
-        let (sign, exponent, significand) = mul(sign0, exponent0, significand0, sign1, exponent1, significand1);
+        let (sign, exponent, significand) = mul(v0, v1);
 
-        let (sign2, exponent2, significand2) = (
-            Self::sign(v2),
-            Self::exponent(v2),
-            Self::significand(v2),
-        );
-
-        add(sign, exponent, significand, sign2, exponent2, significand2)
+        add(sign, exponent, significand, v2)
     }
 
 }
 
-fn mul(sign0: u16, exponent0: u16, significand0: u16, sign1: u16, exponent1: u16, significand1: u16, ) -> (u16, i16, u32) {
+fn mul(v0: SoftFloat16, v1: SoftFloat16) -> (u16, i16, u32) {
+    let (sign0, exponent0, significand0) = (
+        SoftFloat16::sign(v0),
+        SoftFloat16::exponent(v0),
+        SoftFloat16::significand(v0),
+    );
+
+    let (sign1, exponent1, significand1) = (
+        SoftFloat16::sign(v1),
+        SoftFloat16::exponent(v1),
+        SoftFloat16::significand(v1),
+    );
+
     let sign = sign0 ^ sign1;
 
     // handle denormals and implicit bit
@@ -74,7 +70,13 @@ fn mul(sign0: u16, exponent0: u16, significand0: u16, sign1: u16, exponent1: u16
     (sign, exponent, significand)
 }
 
-fn add(sign0: u16, exponent0: i16, significand0: u32, sign1: u16, exponent1: u16, significand1: u16) -> SoftFloat16 {
+fn add(sign0: u16, exponent0: i16, significand0: u32, v1: SoftFloat16) -> SoftFloat16 {
+    let (sign1, exponent1, significand1) = (
+        SoftFloat16::sign(v1),
+        SoftFloat16::exponent(v1),
+        SoftFloat16::significand(v1),
+    );
+
     let significand0 = significand0 as u64;
 
     // handle denormals and implicit bit
@@ -94,7 +96,7 @@ fn add(sign0: u16, exponent0: i16, significand0: u32, sign1: u16, exponent1: u16
     // if shift is too large, not even grs bits are influenced by first summand
     // and we can return early
     if shift >= 11 + 3 + 1 {
-        todo!("shift too large");
+        return v1;
     }
 
     let significand1 = if shift < 0 {
@@ -138,6 +140,18 @@ fn add(sign0: u16, exponent0: i16, significand0: u32, sign1: u16, exponent1: u16
         todo!();
     };
 
+    let (exponent, significand) = if exponent <= 0 {
+        // must convert to denormal number; make exponent representable by
+        // shifting significand
+        let shift = 1 - exponent;
+        let sticky_bits = (1 << shift) - 1;
+        let sticky = (significand & sticky_bits != 0) as u16;
+        let significand = (significand >> shift) | sticky;
+        (1, significand)
+    } else {
+        (exponent as u16, significand)
+    };
+
     // rounding (to even)
     let grs = significand & 0x7;
     let significand = significand >> 3;
@@ -158,7 +172,7 @@ fn add(sign0: u16, exponent0: i16, significand0: u32, sign1: u16, exponent1: u16
     };
 
     // cut off implicit bit and allow into exponent
-    SoftFloat16::from_bits(sign << 15 | ((exponent as u16) << 10 | significand & 0x3FF) + rnd)
+    SoftFloat16::from_bits(sign << 15 | (exponent << 10 | significand & 0x3FF) + rnd)
 }
 
 impl MulAdd for f32 {
@@ -184,7 +198,10 @@ mod tests {
             (0x3e00, 0x3e00, 0x3a00),
             (0x3e00, 0x3e00, 0x4200),
             (0x1e00, 0x1e00, 0x3200),
-            // (0x1, 0x1, 0x7bff),
+            (0x1e00, 0x1e00, 0x0200),
+            (0x1a00, 0x1a00, 0x0100),
+            (0x1, 0x1, 0x7bff),
+            (0x5900, 0x5900, 0x1),
             // 8444 BB7E B430 B430
             // (0x8444, 0xBB7E, 0xB430),
         ] {
@@ -196,6 +213,33 @@ mod tests {
             println!("\n{:016b} {} <- y", SoftFloat16::to_bits(y), y);
             println!("{:016b} {} <- y_f", SoftFloat16::to_bits(y_f), y_f);
             assert_eq!(SoftFloat16::to_bits(y), SoftFloat16::to_bits(y_f));
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_all_mul_add() {
+        for i in 0..u16::MAX {
+            for j in 0..u16::MAX {
+                for k in 0..u16::MAX {
+                    let x0 = SoftFloat16::from_bits(i);
+                    let x1 = SoftFloat16::from_bits(j);
+                    let x2 = SoftFloat16::from_bits(k);
+                    let y = SoftFloat16::mul_add(x0, x1, x2);
+                    let y_f = SoftFloat16::from(f32::from(x0).mul_add(f32::from(x1), f32::from(x2)));
+                    if y == NAN || y_f == NAN {
+                        assert!(y == NAN, "{:?}", (i, j, k));
+                        assert!(y_f == NAN, "{:?}", (i, j, k));
+                    } else {
+                        assert_eq!(
+                            SoftFloat16::to_bits(y),
+                            SoftFloat16::to_bits(y_f),
+                            "{:?}",
+                            (i, j, k)
+                        );
+                    }
+                }
+            }
         }
     }
 }
