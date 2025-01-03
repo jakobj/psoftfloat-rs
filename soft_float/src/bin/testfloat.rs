@@ -5,6 +5,7 @@ use std::{
     ops::{Add, Div, Mul, Rem, Sub},
 };
 
+use soft_float::MulAdd;
 use soft_float::RoundTiesEven;
 use soft_float::SoftFloat16;
 
@@ -76,6 +77,7 @@ fn testfloat<
         + Add<Output = T_IN>
         + Sub<Output = T_IN>
         + Mul<Output = T_IN>
+        + MulAdd
         + Div<Output = T_IN>
         + Rem<Output = T_IN>
         + Debug
@@ -129,6 +131,21 @@ fn testfloat<
                     T_IN::hex_str_to_float(words[1]),
                 );
                 let result = T_IN::mul(value0, value1);
+                format!(
+                    "{} {} {} {}",
+                    words[0],
+                    words[1],
+                    T_OUT::float_to_hex_str(T_OUT::from(result)),
+                    words[3]
+                )
+            }
+            "mulAdd" => {
+                let (value0, value1, value2) = (
+                    T_IN::hex_str_to_float(words[0]),
+                    T_IN::hex_str_to_float(words[1]),
+                    T_IN::hex_str_to_float(words[2]),
+                );
+                let result = T_IN::mul_add(value0, value1, value2);
                 format!(
                     "{} {} {} {}",
                     words[0],
