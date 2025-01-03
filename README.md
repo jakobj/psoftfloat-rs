@@ -24,3 +24,4 @@ This implementation is for educational purposes only. It is explicitly not optim
 - https://cs.stackexchange.com/questions/80668/simple-algorithm-for-ieee-754-division-on-8-bit-cpu
 - https://link.springer.com/book/10.1007/978-3-319-76526-6
 - https://simonv.fr/TypesConvert/?integers
+- https://www.sciencedirect.com/book/9781558607989/digital-arithmetic
