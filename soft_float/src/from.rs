@@ -116,17 +116,14 @@ impl From<i32> for SoftFloat16 {
         let bits = value as u32;
 
         let sign = (bits >> 31) as u16;
-        let significand = if sign == 0 {
-            value as u32
-        } else {
-            -value as u32
-        };
+        let significand = value.abs() as u32;
 
         if significand == 0 {
             return if sign == 0 { POS_ZERO } else { NEG_ZERO };
         }
 
         if significand >= (1 << 16) {
+            // overflow
             return if sign == 0 {
                 POS_INFINITY
             } else {
@@ -134,24 +131,34 @@ impl From<i32> for SoftFloat16 {
             };
         }
 
+        let significand = significand as u16;
+
+        // normalize
         let mut exponent = 30;
         let mut significand = significand;
         while significand & (1 << 15) == 0 {
             significand <<= 1;
             exponent -= 1;
         }
-        let sticky = if significand & 0x7 == 0 { 0 } else { 1 };
-        let significand = significand >> 2 | sticky;
 
+        // fit into 11 (significand) + 3 (grs) bits
+        let sticky = if significand & 0x7 == 0 { 0 } else { 1 };
+        let significand = significand >> (16 - 14) | sticky;
+
+        // rounding (to even)
         let grs = significand & 0x7;
-        let significand = (significand >> 3) as u16;
+        let significand = significand >> 3;
         let lsb = significand & 1;
-        if grs < 0x4 || (grs == 0x4 && lsb == 0) {
-            Self::from_bits(sign << 15 | exponent << 10 | (significand & 0x3ff))
+        let rnd = if grs < 0x4 || (grs == 0x4 && lsb == 0) {
+            // round down
+            0
         } else {
-            // allow significand to overflow into exponent
-            Self::from_bits(sign << 15 | (exponent << 10 | (significand & 0x3ff)) + 1)
-        }
+            // round up
+            1
+        };
+
+        // cut off implicit bit and allow overflow into exponent
+        Self::from_bits(sign << 15 | (exponent << 10 | significand & 0x3FF) + rnd)
     }
 }
 
@@ -166,7 +173,7 @@ impl From<SoftFloat16> for i32 {
         );
 
         if exponent == 0x1F {
-            // Infinity and NAN returned as largest-magnitude negative integer
+            // Infinity and NAN are returned as largest-magnitude negative integer
             // http://www.jhauser.us/arithmetic/TestFloat-3/doc/TestFloat-general.html, sec 6.1
             return 1 << 31;
         }
@@ -174,12 +181,14 @@ impl From<SoftFloat16> for i32 {
         let unbiased_exponent = (exponent as i16) - 15;
 
         if unbiased_exponent < 0 {
+            // underflow
             return 0;
         }
 
-        let shift = unbiased_exponent - 10;
-        let significand = (significand | 0x400) as i32;
+        let significand = (significand | 0x400) as i32; // include implicit bit
 
+        // shift to make sure lsb has exponent 0
+        let shift = unbiased_exponent - 10;
         let significand = if shift < 0 {
             significand >> -shift
         } else {
