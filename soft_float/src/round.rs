@@ -60,13 +60,13 @@ impl RoundTiesEven for SoftFloat16 {
 
 impl RoundTiesEven for f32 {
     fn round_ties_even(_v: Self) -> Self {
-        unreachable!();
+        unimplemented!();
     }
 }
 
 impl RoundTiesEven for i32 {
     fn round_ties_even(_v: Self) -> Self {
-        unreachable!();
+        unimplemented!();
     }
 }
 
