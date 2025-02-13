@@ -61,57 +61,9 @@ impl SoftFloat16 {
     }
 }
 
-impl fmt::Display for SoftFloat16 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", f32::from(*self))
-        // if self.exponent == 0 {
-        //     if self.significand == 0 {
-        //         // zero
-        //         return write!(f, "{}", (-1.0_f64).powi(self.sign as i32) * 0.0);
-        //     } else {
-        //         // subnormal
-        //         // +- (d0 beta^{-1} + d1 beta^{-2} + ... + d_{p-1} beta^{-p}) beta^{-14}
-        //         // = +- ((d0 beta^{p-1} + d1 beta^{p-2} + ... + d_{p-1} beta^0) beta^{-p}) beta^{-14}
-        //         // = +- significand beta^{-p-14}
-        //         return write!(
-        //             f,
-        //             "{}",
-        //             (-1.0_f64).powi(self.sign as i32)
-        //                 * (self.significand as f64)
-        //                 * 2_f64.powi(-10 - 14)
-        //         );
-        //     }
-        // }
-        // if self.exponent == 0x1F {
-        //     if self.significand == 0 {
-        //         // infinity
-        //         return write!(f, "inf");
-        //     } else {
-        //         return write!(f, "NaN");
-        //     };
-        // }
-
-        // let unbiased_exponent = SoftFloat16::unbiased_exponent(self);
-        // let significand = self.significand | 0x400; // include the implicit bit
-        //                                             // +- (d0 + d1 beta^{-1} + ... + d_{p-1} beta^{-(p-1)}) beta^e
-        //                                             // = +- ((d0 beta^{p-1} + d1 beta^{p-2} + ... + d_{p-1} beta^0) beta^{-(p-1)}) beta^e
-        //                                             // = +- significand beta^{-(p-1) + e}
-        // let value = (-1.0_f64).powi(self.sign as i32)
-        //     * (significand as f64)
-        //     * 2_f64.powi((-10 + unbiased_exponent) as i32);
-        // write!(f, "{}", value)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // #[test]
-    // fn test_display() {
-    //     let x = SoftFloat16::new(0, 14, 659);
-    //     assert_eq!(format!("{}", x), "0.82177734375");
-    // }
 
     #[test]
     fn test_all_clz() {
