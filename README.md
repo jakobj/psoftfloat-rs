@@ -10,7 +10,21 @@ It is explicitly not optimized for speed, but readability.
 
 ## Testing
 
-We use the [Berkeley TestFloat](http://www.jhauser.us/arithmetic/TestFloat.html) programs to verify the implementation.
+You can execute a couple of special test cases via
+```console
+$ cd soft_float
+$ cargo test
+```
+This is particularly helpful during development, but doesn't exactly proof correctness of the implementation.
+
+For half-precision floats, we can actually [test them all](https://randomascii.wordpress.com/2014/01/27/theres-only-four-billion-floatsso-test-them-all/).
+By default, these exhaustive tests are ignored, but you can execute them via
+```console
+$ cd soft_float
+$ cargo test -- --ignored
+```
+
+Furthermore, we use the [Berkeley TestFloat](http://www.jhauser.us/arithmetic/TestFloat.html) programs to verify the implementation.
 Exception flags are merely copied over from the `testfloat_gen` output.
 You can execute the tests by
 ```console
