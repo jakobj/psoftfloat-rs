@@ -2,6 +2,7 @@
 Software implementation of half-precision floating point numbers according to IEEE 754.
 Not all operations are supported.
 Only round to nearest, ties to even is implemented.
+Note that this implementation does not generate floating-point exception flags for underflow etc.
 
 ## WARNING
 This implementation is for educational purposes only.
@@ -10,6 +11,12 @@ It is explicitly not optimized for speed, but readability.
 ## Testing
 
 We use the [Berkeley TestFloat](http://www.jhauser.us/arithmetic/TestFloat.html) programs to verify the implementation.
+Exception flags are merely copied over from the `testfloat_gen` output.
+You can execute the tests by
+```console
+$ cd tests
+$ make
+```
 
 ## Resources
 - https://en.wikipedia.org/wiki/Half-precision_floating-point_format
