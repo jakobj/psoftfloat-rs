@@ -8,6 +8,22 @@ Note that this implementation does not generate floating-point exception flags f
 This implementation is for educational purposes only.
 It is explicitly not optimized for speed, but readability.
 
+## Usage
+
+``` rust
+use soft_float::SoftFloat16;
+
+fn main() {
+    let x = SoftFloat16::from_bits(0x4198); // 2.796875
+    let y = SoftFloat16::from_bits(0xb180); // -0.171875
+    let z = x * y;
+
+    assert!(SoftFloat16::to_bits(z) == 0xb7b1);
+
+    println!("{} * {} = {}", f32::from(x), f32::from(y), f32::from(z)); // print via `f32`
+}
+```
+
 ## Testing
 
 You can execute a couple of special test cases via
